@@ -77,7 +77,7 @@
 #   actions requiring a per-AU request like --crawl, --deep-crawl or --poll).
 #
 
-__version__ = '0.1'
+__version__ = '0.1.1'
 
 import base64
 import getpass
@@ -91,10 +91,10 @@ LAUIDS = 'auids'
 SAUTH = 'auth'
 BCRAWL = 'crawl'
 BCRAWLPLUGINS = 'crawl-plugins'
-BDEEPCRAWL = 'deep-crawls'
+BDEEPCRAWL = 'deep-crawl'
 IDEPTH = 'depth'
 LHOSTS = 'hosts'
-BPOLL = 'polls'
+BPOLL = 'poll'
 BRELOADCONFIG = 'reload-config'
 IWAIT = 'wait'
 
