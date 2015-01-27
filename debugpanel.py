@@ -77,7 +77,7 @@
 #   actions requiring a per-AU request like --crawl, --deep-crawl or --poll).
 #
 
-__version__ = '0.1.1'
+__version__ = '0.1.2'
 
 import base64
 import getpass
@@ -108,8 +108,8 @@ def make_parser():
   parser.add_option('--crawl-plugins', help='causes plugin registries to be crawled', action='store_true', default=False)
   parser.add_option('--deep-crawl', help='requests deep crawl of selected AUs', action='store_true', default=False)
   parser.add_option('--depth', help='custom depth of deep crawls', default='123')
-  parser.add_option('--host', help='host name')
-  parser.add_option('--hosts', metavar='HFILE', help='reads host names from HFILE instead of --host')
+  parser.add_option('--host', help='host name and port')
+  parser.add_option('--hosts', metavar='HFILE', help='reads host names and ports from HFILE instead of --host')
   parser.add_option('--password', metavar='PASS', help='UI password')
   parser.add_option('--poll', help='calls poll on selected AUs', action='store_true', default=False)
   parser.add_option('--reload-config', help='causes the config to be reloaded', action='store_true', default=False)
@@ -132,7 +132,7 @@ def process_options(opts, args):
   options[BRELOADCONFIG] = opts.reload_config
   if opts.auids: options[LAUIDS] = file_lines(opts.auids)
   else: options[LAUIDS] = args
-  if opts.username is None: u = getpass.getpass('UI username: ')
+  if opts.username is None: u = raw_input('UI username: ')
   else: u = opts.username
   if opts.password is None: p = getpass.getpass('UI password: ')
   else: p = opts.password
