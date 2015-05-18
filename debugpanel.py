@@ -2,86 +2,80 @@
 
 # $Id$
 
-#
-# Copyright (c) 2000-2015 Board of Trustees of Leland Stanford Jr. University,
-# all rights reserved.
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-# STANFORD UNIVERSITY BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-# WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-# IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-# Except as contained in this notice, the name of Stanford University shall not
-# be used in advertising or otherwise to promote the sale, use or other dealings
-# in this Software without prior written authorization from Stanford University.
-#
+__copyright__ = '''\
+Copyright (c) 2000-2015 Board of Trustees of Leland Stanford Jr. University,
+all rights reserved.
 
-#
-# A script to interact with DebugPanel.
-#
-# Usage examples:
-#
-# debugpanel.py --host=lockss.university.edu:8081 --reload-config
-#   Causes lockss.university.edu:8081 to reload its config. (Prompts for a UI
-#   username and password.)
-#
-# debugpanel.py --host=lockss.university.edu:8081 --reload-config --username=UUU
-#   Same, but uses UUU as the UI username (and prompts for a UI password).
-#
-# debugpanel.py --hosts=myhosts.txt --reload-config
-#   Causes each host listed in myhosts.txt to reload its config. (Prompts for a
-#   UI username and password once, used for all hosts.) Lines that are empty,
-#   are all white space, or begin with the character '#' are ignored, other
-#   lines are expected to be a host.
-#
-# debugpanel.py --hosts=myhosts.txt --crawl-plugins
-#   Causes each host listed in myhosts.txt to crawl its plugin registries.
-#
-# debugpanel.py --hosts=myhosts.txt --crawl 'auid1' 'auid2' 'auid3'
-#   Causes each host listed in myhosts.txt to request a crawl of the AUs
-#   identified by the AUIDs auid1, auid2 and auid3. Quoting recommended (AUIDs
-#   have ampersands, which conflict with shell commands.)
-#
-# debugpanel.py --hosts=myhosts.txt --crawl --auids=myauids.txt
-#   Causes each host listed in myhosts.txt to request a crawl of the AUs
-#   identified by the AUIDS listed in myauids.txt. Lines in the latter that are
-#   empty, are all white space, or begin with the character '#' are ignored,
-#   other lines are expected to be an AUID.
-#
-# debugpanel.py --hosts=myhosts.txt --deep-crawl --auids=myauids.txt
-#   Causes each host listed in myhosts.txt to request a deep crawl of the AUs
-#   identified by the AUIDS listed in myauids.txt (using some large depth).
-#
-# debugpanel.py --hosts=myhosts.txt --deep-crawl --auids=myauids.txt --depth=DDD
-#   Causes each host listed in myhosts.txt to request a deep crawl of the AUs
-#   identified by the AUIDS listed in myauids.txt (using the integer depth DDD).
-#
-# debugpanel.py --hosts=myhosts.txt --poll --auids=myauids.txt
-#   Causes each host listed in myhosts.txt to request a poll of the AUs
-#   identified by the AUIDS listed in myauids.txt.
-#
-# debugpanel.py --hosts=myhosts.txt --poll --auids=myauids.txt --wait=WWW
-#   Same, but waits WWW seconds between each request (recommended for all
-#   actions requiring a per-AU request like --crawl, --deep-crawl or --poll).
-#
-# Multiple --host and --hosts are allowed, compounding to an overall list of
-# hosts to be processed. Likewise, multiple --auids and command line AUIDs are
-# allowed, compounding to an overall list of AUIDs to be processed.
-#
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-__version__ = '0.1.3'
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+STANFORD UNIVERSITY BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Except as contained in this notice, the name of Stanford University shall not
+be used in advertising or otherwise to promote the sale, use or other dealings
+in this Software without prior written authorization from Stanford University.
+'''
+
+__man__ = '''\
+A script to interact with DebugPanel.
+
+A list of hosts is built up by accumulating host:port pairs passed with --host
+and host:port pairs read from files passed with --hosts.
+
+If a username is passed with --username, use it to connect to hosts, otherwise
+prompt for one interactively. Likewise, if a password is passed with
+--password, use it to connect to hosts, otherwise prompt for one
+interactively.
+
+Operations that can be applied to each host include:
+  --crawl-plugins
+      Causes the daemon to recrawl plugin registries.
+
+  --reload-config
+      Causes the daemon to reload its config.
+
+Other operations are applied to specific AUs. A list of AUIDs is built up by
+accumulating those read from files passed with --auids and those passed via
+the command line as arguments.
+
+Operations that can be applied to each AU of each host include:
+
+  --check-substance
+      Requests a substance check of the AU.
+
+  --crawl
+      Requests a crawl of the AU.
+
+  --deep-crawl
+      Requests a deep crawl of the AU. You can specify a custom depth with
+      --depth.
+
+  --disable-indexing
+      Disables indexing of the metadata of the AU.
+
+  --poll
+      Requests a poll of the AU.
+
+  --reindex-metadata
+      Requests reindexing of the metadata of the AU.
+
+Currently, all individual operations are performed sequentially. You can add a
+pause with --wait (expressed in whole seconds).
+'''
+
+__version__ = '0.2.0'
 
 import base64
 import getpass
@@ -97,18 +91,23 @@ class Options(object):
     super(Options, self).__init__()
     self.__auth = None
     self.__auids = list()
+    self.__check_substance = False
     self.__crawl = False
     self.__crawl_plugins = False
     self.__deep_crawl = False
     self.__depth = Options.DEPTH
+    self.__disable_indexing = False
     self.__hosts = list()
     self.__poll = False
+    self.__reindex_metadata = False
     self.__reload_config = False
     self.__wait = Options.WAIT
   def add_auids(self, auids): self.__auids.extend(auids)
   def get_auids(self): return self.__auids
   def set_auth(self, auth): self.__auth = auth
   def get_auth(self): return self.__auth
+  def set_check_substance(self, check_substance): self.__check_substance = check_substance
+  def is_check_substance(self): return self.__check_substance
   def set_crawl(self, crawl): self.__crawl = crawl
   def is_crawl(self): return self.__crawl
   def set_crawl_plugins(self, crawl_plugins): self.__crawl_plugins = crawl_plugins
@@ -117,10 +116,14 @@ class Options(object):
   def is_deep_crawl(self): return self.__deep_crawl
   def set_depth(self, depth): self.__depth = depth
   def get_depth(self): return self.__depth
+  def set_disable_indexing(self, disable_indexing): self.__disable_indexing = disable_indexing
+  def is_disable_indexing(self): return self.__disable_indexing
   def add_hosts(self, hosts): self.__hosts.extend(hosts)
   def get_hosts(self): return self.__hosts
   def set_poll(self, poll): self.__poll = poll
   def is_poll(self): return self.__poll
+  def set_reindex_metadata(self, reindex_metadata): self.__reindex_metadata = reindex_metadata
+  def is_reindex_metadata(self): return self.__reindex_metadata
   def set_reload_config(self, reload_config): self.__reload_config = reload_config
   def is_reload_config(self): return self.__reload_config
   def set_wait(self, wait): self.__wait = wait
@@ -130,35 +133,41 @@ class Options(object):
 must_sleep = False
 
 def make_parser():
-  parser = optparse.OptionParser(version=__version__, usage='%prog [--host=HOST] [--hosts=HFILE] [OPTIONS] [--auids=AFILE] [AUID...]')
+  parser = optparse.OptionParser(version=__version__, usage='%prog [--host=HOST|--hosts=HFILE]... [OPTIONS] [--auids=AFILE|AUID]...')
   parser.add_option('--auids', action='append', default=list(), metavar='AFILE', help='adds AUIDs from AFILE to the list of AUIDs')
+  parser.add_option('--check-substance', action='store_true', default=False, help='requests substance check of selected AUs')
   parser.add_option('--crawl', action='store_true', default=False, help='requests crawl of selected AUs')
   parser.add_option('--crawl-plugins', action='store_true', default=False, help='causes plugin registries to be crawled')
   parser.add_option('--deep-crawl', action='store_true', default=False, help='requests deep crawl of selected AUs')
   parser.add_option('--depth', type='int', default=Options.DEPTH, help='depth of deep crawls (default %default)')
-  parser.add_option('--host', action='append', default=list(), help='adds host name and port to the list of hosts')
-  parser.add_option('--hosts', action='append', default=list(), metavar='HFILE', help='adds host names and ports from HFILE to the list of hosts')
+  parser.add_option('--disable-indexing', action='store_true', default=False, help='disables indexing of selected AUs')
+  parser.add_option('--host', action='append', default=list(), help='adds host:port pair to the list of hosts')
+  parser.add_option('--hosts', action='append', default=list(), metavar='HFILE', help='adds host:port pairs from HFILE to the list of hosts')
   parser.add_option('--password', metavar='PASS', help='UI password')
   parser.add_option('--poll', action='store_true', default=False, help='calls poll on selected AUs')
+  parser.add_option('--reindex-metadata', action='store_true', default=False, help='requests metadata reindexing of selected AUs')
   parser.add_option('--reload-config', action='store_true', default=False, help='causes the config to be reloaded')
   parser.add_option('--username', metavar='USER', help='UI username')
   parser.add_option('--wait', type='int', default=Options.WAIT, metavar='SEC', help='wait SEC seconds between requests (default %default)')
   return parser
 
-def process_options(opts, args):
+def process_options(parser, opts, args):
   options = Options()
-  if len(filter(None, [opts.crawl, opts.crawl_plugins, opts.deep_crawl, opts.poll, opts.reload_config])) == 0:
-    sys.exit('Error: at least one of --crawl, --crawl-plugins, --deep-crawl, --poll, --reload-config is required')
-  if len(opts.host) + len(opts.hosts) == 0: sys.exit('Error: at least one host is required')
+  if len(filter(None, [opts.check_substance, opts.crawl, opts.crawl_plugins, opts.deep_crawl, opts.disable_indexing, opts.poll, opts.reindex_metadata, opts.reload_config])) == 0:
+    parser.error('At least one of --check-substance, --crawl, --crawl-plugins, --deep-crawl, --disable-indexing, --poll, --reindex-metadata, --reload-config is required')
+  if len(opts.host) + len(opts.hosts) == 0: parser.error('At least one host is required')
   options.add_hosts(opts.host)
   for f in opts.hosts: options.add_hosts(file_lines(f))
+  options.set_check_substance(opts.check_substance)
   options.set_crawl(opts.crawl)
   options.set_crawl_plugins(opts.crawl_plugins)
   options.set_deep_crawl(opts.deep_crawl)
+  options.set_disable_indexing(opts.disable_indexing)
   options.set_poll(opts.poll)
+  options.set_reindex_metadata(opts.reindex_metadata)
   options.set_reload_config(opts.reload_config)
-  if len(filter(None, [opts.crawl, opts.deep_crawl, opts.poll])) > 0 and len(args) + len(opts.auids) == 0:
-    sys.exit('Error: for --crawl, --deep-crawl, --poll, at least one AUID is required')
+  if len(filter(None, [opts.check_substance, opts.crawl, opts.deep_crawl, opts.disable_indexing, opts.poll, opts.reindex_metadata])) > 0 and len(args) + len(opts.auids) == 0:
+    parser.error('For --check-substance, --crawl, --deep-crawl, --disable-indexing, --poll, --reindex-metadata, at least one AUID is required')
   options.add_auids(args)
   for f in opts.auids: options.add_auids(file_lines(f))
   if opts.username is None: u = raw_input('UI username: ')
@@ -182,14 +191,23 @@ def do_per_host(options, host, action):
   req = make_request(options, host, 'action=%s' % (action_enc,))
   execute_request(req, host)
 
+def do_check_substance(options, host, auid):
+  do_per_auid(options, host, 'Check Substance', auid)
+
 def do_crawl(options, host, auid):
   do_per_auid(options, host, 'Force Start Crawl', auid)
 
 def do_deep_crawl(options, host, auid):
   do_per_auid(options, host, 'Force Deep Crawl', auid, depth=options.get_depth())
 
+def do_disable_indexing(options, host, auid):
+  do_per_auid(options, host, 'Disable Indexing', auid)
+
 def do_poll(options, host, auid):
   do_per_auid(options, host, 'Start V3 Poll', auid)
+
+def do_reindex_metadata(options, host, auid):
+  do_per_auid(options, host, 'Reindex Metadata', auid)
 
 def do_per_auid(options, host, action, auid, **kwargs):
   maybe_sleep(options)
@@ -225,12 +243,15 @@ def file_lines(filestr):
 if __name__ == '__main__':
   parser = make_parser()
   (opts, args) = parser.parse_args()
-  options = process_options(opts, args)
+  options = process_options(parser, opts, args)
   for host in options.get_hosts():
     if options.is_crawl_plugins(): do_crawl_plugins(options, host)
     if options.is_reload_config(): do_reload_config(options, host)
     for auid in options.get_auids():
+      if options.is_check_substance(): do_check_substance(options, host, auid)
       if options.is_crawl(): do_crawl(options, host, auid)
-      if options.is_deep_crawl(): do_deep_crawl(options, host, auid)
+      if options.is_disable_indexing(): do_disable_indexing(options, host, auid)
+      if options.is_crawl(): do_crawl(options, host, auid)
       if options.is_poll(): do_poll(options, host, auid)
+      if options.is_reindex_metadata(): do_reindex_metadata(options, host, auid)
 
