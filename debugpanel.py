@@ -75,7 +75,7 @@ Currently, all individual operations are performed sequentially. You can add a
 pause with --wait (expressed in whole seconds).
 '''
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 import base64
 import getpass
@@ -233,7 +233,7 @@ def execute_request(req, host):
     sys.exit('Error: %s: %s' % (host, e.reason))
   except urllib2.HTTPError as e:
     if e.code == 401: sys.exit('Error: %s: bad username or password (HTTP 401)' % (host,))
-    else: sys.exit('Error: %s: HTTP %d' % (host, e.code,))
+    else: sys.exit('Error: %s: HTTP %d' % (host, e.code))
 
 def file_lines(filestr):
   ret = [line.strip() for line in open(filestr).readlines() if not (line.isspace() or line.startswith('#'))]
