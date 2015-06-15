@@ -28,6 +28,8 @@ be used in advertising or otherwise to promote the sale, use or other dealings
 in this Software without prior written authorization from Stanford University.
 '''
 
+__version__ = '0.2.3'
+
 __man__ = '''\
 A script to interact with DebugPanel.
 
@@ -36,10 +38,10 @@ and host:port pairs read from files passed with --hosts.
 
 If a username is passed with --username, use it to connect to hosts, otherwise
 prompt for one interactively. Likewise, if a password is passed with
---password, use it to connect to hosts, otherwise prompt for one
-interactively.
+--password, use it to connect to hosts, otherwise prompt for one interactively.
 
 Operations that can be applied to each host include:
+
   --crawl-plugins
       Causes the daemon to recrawl plugin registries.
 
@@ -72,10 +74,9 @@ Operations that can be applied to each AU of each host include:
       Requests reindexing of the metadata of the AU.
 
 Currently, all individual operations are performed sequentially. You can add a
-pause with --wait (expressed in whole seconds).
+pause with --wait (expressed in whole seconds). The --keep-going option goes on
+to the next host if something fails for a given host.
 '''
-
-__version__ = '0.2.1'
 
 import base64
 import getpass
@@ -98,6 +99,7 @@ class Options(object):
     self.__depth = Options.DEPTH
     self.__disable_indexing = False
     self.__hosts = list()
+    self.__keep_going = False
     self.__poll = False
     self.__reindex_metadata = False
     self.__reload_config = False
@@ -106,28 +108,30 @@ class Options(object):
   def get_auids(self): return self.__auids
   def set_auth(self, auth): self.__auth = auth
   def get_auth(self): return self.__auth
-  def set_check_substance(self, check_substance): self.__check_substance = check_substance
   def is_check_substance(self): return self.__check_substance
-  def set_crawl(self, crawl): self.__crawl = crawl
+  def set_check_substance(self, check_substance): self.__check_substance = check_substance
   def is_crawl(self): return self.__crawl
-  def set_crawl_plugins(self, crawl_plugins): self.__crawl_plugins = crawl_plugins
+  def set_crawl(self, crawl): self.__crawl = crawl
   def is_crawl_plugins(self): return self.__crawl_plugins
-  def set_deep_crawl(self, deep_crawl): self.__deep_crawl = deep_crawl
+  def set_crawl_plugins(self, crawl_plugins): self.__crawl_plugins = crawl_plugins
   def is_deep_crawl(self): return self.__deep_crawl
-  def set_depth(self, depth): self.__depth = depth
+  def set_deep_crawl(self, deep_crawl): self.__deep_crawl = deep_crawl
   def get_depth(self): return self.__depth
-  def set_disable_indexing(self, disable_indexing): self.__disable_indexing = disable_indexing
+  def set_depth(self, depth): self.__depth = depth
   def is_disable_indexing(self): return self.__disable_indexing
-  def add_hosts(self, hosts): self.__hosts.extend(hosts)
+  def set_disable_indexing(self, disable_indexing): self.__disable_indexing = disable_indexing
   def get_hosts(self): return self.__hosts
-  def set_poll(self, poll): self.__poll = poll
+  def add_hosts(self, hosts): self.__hosts.extend(hosts)
+  def is_keep_going(self): return self.__keep_going
+  def set_keep_going(self, keep_going): self.__keep_going = keep_going
   def is_poll(self): return self.__poll
-  def set_reindex_metadata(self, reindex_metadata): self.__reindex_metadata = reindex_metadata
+  def set_poll(self, poll): self.__poll = poll
   def is_reindex_metadata(self): return self.__reindex_metadata
-  def set_reload_config(self, reload_config): self.__reload_config = reload_config
+  def set_reindex_metadata(self, reindex_metadata): self.__reindex_metadata = reindex_metadata
   def is_reload_config(self): return self.__reload_config
-  def set_wait(self, wait): self.__wait = wait
+  def set_reload_config(self, reload_config): self.__reload_config = reload_config
   def get_wait(self): return self.__wait
+  def set_wait(self, wait): self.__wait = wait
 
 # Global
 must_sleep = False
@@ -143,6 +147,7 @@ def make_parser():
   parser.add_option('--disable-indexing', action='store_true', default=False, help='disables indexing of selected AUs')
   parser.add_option('--host', action='append', default=list(), help='adds host:port pair to the list of hosts')
   parser.add_option('--hosts', action='append', default=list(), metavar='HFILE', help='adds host:port pairs from HFILE to the list of hosts')
+  parser.add_option('--keep-going', action='store_true', default=False, help='if an error occurs, go on to the next host')
   parser.add_option('--password', metavar='PASS', help='UI password')
   parser.add_option('--poll', action='store_true', default=False, help='calls poll on selected AUs')
   parser.add_option('--reindex-metadata', action='store_true', default=False, help='requests metadata reindexing of selected AUs')
@@ -153,30 +158,31 @@ def make_parser():
 
 def process_options(parser, opts, args):
   options = Options()
-  if len(filter(None, [opts.check_substance, opts.crawl, opts.crawl_plugins, opts.deep_crawl, opts.disable_indexing, opts.poll, opts.reindex_metadata, opts.reload_config])) == 0:
+  if not any([opts.check_substance, opts.crawl, opts.crawl_plugins, opts.deep_crawl, opts.disable_indexing, opts.poll, opts.reindex_metadata, opts.reload_config]):
     parser.error('At least one of --check-substance, --crawl, --crawl-plugins, --deep-crawl, --disable-indexing, --poll, --reindex-metadata, --reload-config is required')
   if len(opts.host) + len(opts.hosts) == 0: parser.error('At least one host is required')
   options.add_hosts(opts.host)
   for f in opts.hosts: options.add_hosts(file_lines(f))
+  options.set_crawl_plugins(opts.crawl_plugins)
+  options.set_reload_config(opts.reload_config)
+  if any([opts.check_substance, opts.crawl, opts.deep_crawl, opts.disable_indexing, opts.poll, opts.reindex_metadata]) and len(args) + len(opts.auids) == 0:
+    parser.error('For --check-substance, --crawl, --deep-crawl, --disable-indexing, --poll, --reindex-metadata, at least one AUID is required')
+  options.add_auids(args)
+  for f in opts.auids: options.add_auids(file_lines(f))
   options.set_check_substance(opts.check_substance)
   options.set_crawl(opts.crawl)
-  options.set_crawl_plugins(opts.crawl_plugins)
   options.set_deep_crawl(opts.deep_crawl)
   options.set_disable_indexing(opts.disable_indexing)
   options.set_poll(opts.poll)
   options.set_reindex_metadata(opts.reindex_metadata)
-  options.set_reload_config(opts.reload_config)
-  if len(filter(None, [opts.check_substance, opts.crawl, opts.deep_crawl, opts.disable_indexing, opts.poll, opts.reindex_metadata])) > 0 and len(args) + len(opts.auids) == 0:
-    parser.error('For --check-substance, --crawl, --deep-crawl, --disable-indexing, --poll, --reindex-metadata, at least one AUID is required')
-  options.add_auids(args)
-  for f in opts.auids: options.add_auids(file_lines(f))
+  options.set_depth(opts.depth)
+  options.set_keep_going(opts.keep_going)
+  options.set_wait(opts.wait)
   if opts.username is None: u = raw_input('UI username: ')
   else: u = opts.username
   if opts.password is None: p = getpass.getpass('UI password: ')
   else: p = opts.password
   options.set_auth(base64.encodestring('%s:%s' % (u, p)).replace('\n', ''))
-  options.set_depth(opts.depth)
-  options.set_wait(opts.wait)
   return options
 
 def do_crawl_plugins(options, host):
@@ -230,10 +236,10 @@ def make_request(options, host, query, **kwargs):
 def execute_request(req, host):
   try: return urllib2.urlopen(req)
   except urllib2.URLError as e:
-    sys.exit('Error: %s: %s' % (host, e.reason))
+    raise Exception, 'Error: %s: %s' % (host, e.reason)
   except urllib2.HTTPError as e:
-    if e.code == 401: sys.exit('Error: %s: bad username or password (HTTP 401)' % (host,))
-    else: sys.exit('Error: %s: HTTP %d' % (host, e.code))
+    if e.code == 401: raise Exception, 'Error: %s: bad username or password (HTTP 401)' % (host,)
+    else: raise Exception, 'Error: %s: HTTP %d' % (host, e.code)
 
 def file_lines(filestr):
   ret = [line.strip() for line in open(filestr).readlines() if not (line.isspace() or line.startswith('#'))]
@@ -245,13 +251,17 @@ if __name__ == '__main__':
   (opts, args) = parser.parse_args()
   options = process_options(parser, opts, args)
   for host in options.get_hosts():
-    if options.is_crawl_plugins(): do_crawl_plugins(options, host)
-    if options.is_reload_config(): do_reload_config(options, host)
-    for auid in options.get_auids():
-      if options.is_check_substance(): do_check_substance(options, host, auid)
-      if options.is_crawl(): do_crawl(options, host, auid)
-      if options.is_disable_indexing(): do_disable_indexing(options, host, auid)
-      if options.is_crawl(): do_crawl(options, host, auid)
-      if options.is_poll(): do_poll(options, host, auid)
-      if options.is_reindex_metadata(): do_reindex_metadata(options, host, auid)
+    try:
+      if options.is_crawl_plugins(): do_crawl_plugins(options, host)
+      if options.is_reload_config(): do_reload_config(options, host)
+      for auid in options.get_auids():
+        if options.is_check_substance(): do_check_substance(options, host, auid)
+        if options.is_crawl(): do_crawl(options, host, auid)
+        if options.is_deep_crawl(): do_deep_crawl(options, host, auid)
+        if options.is_disable_indexing(): do_disable_indexing(options, host, auid)
+        if options.is_poll(): do_poll(options, host, auid)
+        if options.is_reindex_metadata(): do_reindex_metadata(options, host, auid)
+    except Exception as e:
+      if not options.is_keep_going(): raise
+      print str(e)
 
