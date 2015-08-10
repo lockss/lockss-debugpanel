@@ -28,7 +28,7 @@ be used in advertising or otherwise to promote the sale, use or other dealings
 in this Software without prior written authorization from Stanford University.
 '''
 
-__version__ = '0.2.3'
+__version__ = '0.2.4'
 
 __man__ = '''\
 A script to interact with DebugPanel.
@@ -50,7 +50,7 @@ Operations that can be applied to each host include:
 
 Other operations are applied to specific AUs. A list of AUIDs is built up by
 accumulating those read from files passed with --auids and those passed via
-the command line as arguments.
+--auid and the command line as arguments.
 
 Operations that can be applied to each AU of each host include:
 
@@ -137,7 +137,8 @@ class Options(object):
 must_sleep = False
 
 def make_parser():
-  parser = optparse.OptionParser(version=__version__, usage='%prog [--host=HOST|--hosts=HFILE]... [OPTIONS] [--auids=AFILE|AUID]...')
+  parser = optparse.OptionParser(version=__version__, usage='%prog [--host=HOST|--hosts=HFILE]... [OPTIONS] [--auids=AFILE|--auid=AUID|AUID]...')
+  parser.add_option('--auid', action='append', default=list(), metavar='AUID', help='adds AUID to the list of AUIDs')
   parser.add_option('--auids', action='append', default=list(), metavar='AFILE', help='adds AUIDs from AFILE to the list of AUIDs')
   parser.add_option('--check-substance', action='store_true', default=False, help='requests substance check of selected AUs')
   parser.add_option('--crawl', action='store_true', default=False, help='requests crawl of selected AUs')
@@ -165,9 +166,10 @@ def process_options(parser, opts, args):
   for f in opts.hosts: options.add_hosts(file_lines(f))
   options.set_crawl_plugins(opts.crawl_plugins)
   options.set_reload_config(opts.reload_config)
-  if any([opts.check_substance, opts.crawl, opts.deep_crawl, opts.disable_indexing, opts.poll, opts.reindex_metadata]) and len(args) + len(opts.auids) == 0:
+  if any([opts.check_substance, opts.crawl, opts.deep_crawl, opts.disable_indexing, opts.poll, opts.reindex_metadata]) and len(args) + len(opts.auid) + len(opts.auids) == 0:
     parser.error('For --check-substance, --crawl, --deep-crawl, --disable-indexing, --poll, --reindex-metadata, at least one AUID is required')
   options.add_auids(args)
+  options.add_auids(opts.auid[:])
   for f in opts.auids: options.add_auids(file_lines(f))
   options.set_check_substance(opts.check_substance)
   options.set_crawl(opts.crawl)
