@@ -28,7 +28,7 @@ be used in advertising or otherwise to promote the sale, use or other dealings
 in this Software without prior written authorization from Stanford University.
 '''
 
-__version__ = '0.2.4'
+__version__ = '0.2.5'
 
 __man__ = '''\
 A script to interact with DebugPanel.
@@ -81,6 +81,7 @@ to the next host if something fails for a given host.
 import base64
 import getpass
 import optparse
+import os.path
 import sys
 import time
 import urllib2
@@ -163,14 +164,14 @@ def process_options(parser, opts, args):
     parser.error('At least one of --check-substance, --crawl, --crawl-plugins, --deep-crawl, --disable-indexing, --poll, --reindex-metadata, --reload-config is required')
   if len(opts.host) + len(opts.hosts) == 0: parser.error('At least one host is required')
   options.add_hosts(opts.host)
-  for f in opts.hosts: options.add_hosts(file_lines(f))
+  for f in opts.hosts: options.add_hosts(_file_lines(f))
   options.set_crawl_plugins(opts.crawl_plugins)
   options.set_reload_config(opts.reload_config)
   if any([opts.check_substance, opts.crawl, opts.deep_crawl, opts.disable_indexing, opts.poll, opts.reindex_metadata]) and len(args) + len(opts.auid) + len(opts.auids) == 0:
     parser.error('For --check-substance, --crawl, --deep-crawl, --disable-indexing, --poll, --reindex-metadata, at least one AUID is required')
   options.add_auids(args)
   options.add_auids(opts.auid[:])
-  for f in opts.auids: options.add_auids(file_lines(f))
+  for f in opts.auids: options.add_auids(_file_lines(f))
   options.set_check_substance(opts.check_substance)
   options.set_crawl(opts.crawl)
   options.set_deep_crawl(opts.deep_crawl)
@@ -243,9 +244,10 @@ def execute_request(req, host):
     if e.code == 401: raise Exception, 'Error: %s: bad username or password (HTTP 401)' % (host,)
     else: raise Exception, 'Error: %s: HTTP %d' % (host, e.code)
 
-def file_lines(filestr):
-  ret = [line.strip() for line in open(filestr).readlines() if not (line.isspace() or line.startswith('#'))]
-  if len(ret) == 0: sys.exit('Error: %s contains no meaningful lines' % (filestr,))
+# Last modified 2015-08-31
+def _file_lines(fstr):
+  with open(os.path.expanduser(fstr)) as f: ret = filter(lambda y: len(y) > 0, [x.partition('#')[0].strip() for x in f])
+  if len(ret) == 0: sys.exit('Error: %s contains no meaningful lines' % (fstr,))
   return ret
 
 if __name__ == '__main__':
