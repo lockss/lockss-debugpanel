@@ -28,7 +28,7 @@ be used in advertising or otherwise to promote the sale, use or other dealings
 in this Software without prior written authorization from Stanford University.
 '''
 
-__version__ = '0.2.5'
+__version__ = '0.2.6'
 
 __man__ = '''\
 A script to interact with DebugPanel.
@@ -216,7 +216,7 @@ def do_poll(options, host, auid):
   do_per_auid(options, host, 'Start V3 Poll', auid)
 
 def do_reindex_metadata(options, host, auid):
-  do_per_auid(options, host, 'Reindex Metadata', auid)
+  do_per_auid(options, host, 'Force Reindex Metadata', auid)
 
 def do_per_auid(options, host, action, auid, **kwargs):
   maybe_sleep(options)
