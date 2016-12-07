@@ -1,0 +1,6 @@
+# Eclipse artifacts
+/.project
+
+# Python artifacts
+*.pyc
+*.pyo
