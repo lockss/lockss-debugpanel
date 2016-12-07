@@ -1,9 +1,3 @@
 #!/bin/sh
 
-# $Id$
-#
-# This script lives in our private CVS under the
-# lockss-gamma-tools/scripts/debugpanel directory
-
-DIRECTORY=$(cd `dirname $0` && pwd)
-python $DIRECTORY/debugpanel.py "$@"
+python2 $(cd `dirname $0` && pwd)/debugpanel.py "$@"
