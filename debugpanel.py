@@ -1,37 +1,42 @@
 #!/usr/bin/env python2
 
-# $Id$
+'''A script to interact with the LOCKSS daemon's DebugPanel servlet.'''
+
 
 __copyright__ = '''\
-Copyright (c) 2000-2015 Board of Trustees of Leland Stanford Jr. University,
-all rights reserved.
+Copyright (c) 2000-2016, Board of Trustees of Leland Stanford Jr. University
+All rights reserved.'''
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+__license__ = '''\
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+1. Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-STANFORD UNIVERSITY BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+2. Redistributions in binary form must reproduce the above copyright notice,
+this list of conditions and the following disclaimer in the documentation and/or
+other materials provided with the distribution.
 
-Except as contained in this notice, the name of Stanford University shall not
-be used in advertising or otherwise to promote the sale, use or other dealings
-in this Software without prior written authorization from Stanford University.
-'''
+3. Neither the name of the copyright holder nor the names of its contributors
+may be used to endorse or promote products derived from this software without
+specific prior written permission.
 
-__version__ = '0.2.6'
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.'''
 
-__man__ = '''\
-A script to interact with DebugPanel.
+__version__ = '0.3.0'
+
+__tutorial__ = '''\
+TUTORIAL
 
 A list of hosts is built up by accumulating host:port pairs passed with --host
 and host:port pairs read from files passed with --hosts.
@@ -49,8 +54,8 @@ Operations that can be applied to each host include:
       Causes the daemon to reload its config.
 
 Other operations are applied to specific AUs. A list of AUIDs is built up by
-accumulating those read from files passed with --auids and those passed via
---auid and the command line as arguments.
+accumulating those passed via --auid and those read from files passed with
+--auids.
 
 Operations that can be applied to each AU of each host include:
 
@@ -73,176 +78,194 @@ Operations that can be applied to each AU of each host include:
   --reindex-metadata
       Requests reindexing of the metadata of the AU.
 
-Currently, all individual operations are performed sequentially. You can add a
-pause with --wait (expressed in whole seconds). The --keep-going option goes on
-to the next host if something fails for a given host.
+A certain number of hosts (based on the value of --pool-size) are processed in
+parallel, possibly all at the same time (if the value is zero),  each in a
+separate thread (unless --process-pool is specified, in which case each in a
+separate process).
+
+You can specify a number of seconds to wait between requests to each host with
+--wait.
 '''
 
 import base64
 import getpass
-import optparse
+from multiprocessing import Pool as ProcessPool
+from multiprocessing.dummy import Pool as ThreadPool
+from optparse import OptionGroup, OptionParser
 import os.path
 import sys
+from threading import Thread
 import time
 import urllib2
 
-class Options(object):
-  DEPTH = 123
-  WAIT = 0
-  def __init__(self):
-    super(Options, self).__init__()
-    self.__auth = None
-    self.__auids = list()
-    self.__check_substance = False
-    self.__crawl = False
-    self.__crawl_plugins = False
-    self.__deep_crawl = False
-    self.__depth = Options.DEPTH
-    self.__disable_indexing = False
-    self.__hosts = list()
-    self.__keep_going = False
-    self.__poll = False
-    self.__reindex_metadata = False
-    self.__reload_config = False
-    self.__wait = Options.WAIT
-  def add_auids(self, auids): self.__auids.extend(auids)
-  def get_auids(self): return self.__auids
-  def set_auth(self, auth): self.__auth = auth
-  def get_auth(self): return self.__auth
-  def is_check_substance(self): return self.__check_substance
-  def set_check_substance(self, check_substance): self.__check_substance = check_substance
-  def is_crawl(self): return self.__crawl
-  def set_crawl(self, crawl): self.__crawl = crawl
-  def is_crawl_plugins(self): return self.__crawl_plugins
-  def set_crawl_plugins(self, crawl_plugins): self.__crawl_plugins = crawl_plugins
-  def is_deep_crawl(self): return self.__deep_crawl
-  def set_deep_crawl(self, deep_crawl): self.__deep_crawl = deep_crawl
-  def get_depth(self): return self.__depth
-  def set_depth(self, depth): self.__depth = depth
-  def is_disable_indexing(self): return self.__disable_indexing
-  def set_disable_indexing(self, disable_indexing): self.__disable_indexing = disable_indexing
-  def get_hosts(self): return self.__hosts
-  def add_hosts(self, hosts): self.__hosts.extend(hosts)
-  def is_keep_going(self): return self.__keep_going
-  def set_keep_going(self, keep_going): self.__keep_going = keep_going
-  def is_poll(self): return self.__poll
-  def set_poll(self, poll): self.__poll = poll
-  def is_reindex_metadata(self): return self.__reindex_metadata
-  def set_reindex_metadata(self, reindex_metadata): self.__reindex_metadata = reindex_metadata
-  def is_reload_config(self): return self.__reload_config
-  def set_reload_config(self, reload_config): self.__reload_config = reload_config
-  def get_wait(self): return self.__wait
-  def set_wait(self, wait): self.__wait = wait
+class _DebugPanelOptions(object):
 
-# Global
-must_sleep = False
+    @staticmethod
+    def make_parser():
+        # Create parser
+        usage = '%prog {OPERATION} {--host=HOST|--hosts=HFILE}... [--auid=AUID|--auids=AFILE]... [OPTIONS]...'
+        parser = OptionParser(version=__version__, description=__doc__, usage=usage)
+        parser.add_option('--copyright', action='store_true', help='show copyright and exit')
+        parser.add_option('--license', action='store_true', help='show license and exit')
+        parser.add_option('--tutorial', action='store_true', help='show tutorial and exit')
+        # Operations
+        group = OptionGroup(parser, 'Operations')
+        group.add_option('--check-substance', action='store_true', help='request substance check of AUs')
+        group.add_option('--crawl', action='store_true', help='request crawl of AUs')
+        group.add_option('--crawl-plugins', action='store_true', help='cause plugin registries to be crawled')
+        group.add_option('--deep-crawl', action='store_true', help='request deep crawl of AUs')
+        group.add_option('--disable-indexing', action='store_true', help='disable indexing of AUs')
+        group.add_option('--poll', action='store_true', help='call poll on AUs')
+        group.add_option('--reindex-metadata', action='store_true', help='request metadata reindexing of AUs')
+        group.add_option('--reload-config', action='store_true', help='cause config to be reloaded')
+        parser.add_option_group(group)
+        # Hosts
+        group = OptionGroup(parser, 'Hosts')
+        group.add_option('--host', action='append', default=list(), help='add HOST to target hosts')
+        group.add_option('--hosts', action='append', default=list(), metavar='HFILE', help='add hosts in HFILE to target hosts')
+        group.add_option('--password', metavar='PASS', help='UI password (default: interactive prompt)')
+        group.add_option('--username', metavar='USER', help='UI username (default: interactive prompt)')
+        parser.add_option_group(group)
+        # AUIDs
+        group = OptionGroup(parser, 'AUIDs', 'Required by --check-substance, --crawl, --deep-crawl, --disable-indexing, --poll, --reindex-metadata')
+        group.add_option('--auid', action='append', default=list(), help='add AUID to target AUIDs')
+        group.add_option('--auids', action='append', default=list(), metavar='AFILE', help='add AUIDs in AFILE to target AUIDs')
+        parser.add_option_group(group)
+        # Other options
+        group = OptionGroup(parser, 'Other options')
+        group.add_option('--depth', type='int', default=123, help='depth of deep crawls (default %default)')
+        group.add_option('--keep-going', action='store_true', help='if an error occurs, go on to next target host')
+        group.add_option('--wait', type='int', default=0, metavar='SEC', help='wait SEC seconds between requests (default: %default)')
+        parser.add_option_group(group)
+        # Job pool
+        group = OptionGroup(parser, 'Job pool')
+        group.add_option('--pool-size', metavar='SIZE', type='int', default=0, help='size of job pool, 0 for unlimited (default: %default)')
+        group.add_option('--process-pool', action='store_true', help='use a process pool')
+        group.add_option('--thread-pool', action='store_true', help='use a thread pool (default)')
+        parser.add_option_group(group)
+        # Done
+        return parser
 
-def make_parser():
-  parser = optparse.OptionParser(version=__version__, usage='%prog [--host=HOST|--hosts=HFILE]... [OPTIONS] [--auids=AFILE|--auid=AUID|AUID]...')
-  parser.add_option('--auid', action='append', default=list(), metavar='AUID', help='adds AUID to the list of AUIDs')
-  parser.add_option('--auids', action='append', default=list(), metavar='AFILE', help='adds AUIDs from AFILE to the list of AUIDs')
-  parser.add_option('--check-substance', action='store_true', default=False, help='requests substance check of selected AUs')
-  parser.add_option('--crawl', action='store_true', default=False, help='requests crawl of selected AUs')
-  parser.add_option('--crawl-plugins', action='store_true', default=False, help='causes plugin registries to be crawled')
-  parser.add_option('--deep-crawl', action='store_true', default=False, help='requests deep crawl of selected AUs')
-  parser.add_option('--depth', type='int', default=Options.DEPTH, help='depth of deep crawls (default %default)')
-  parser.add_option('--disable-indexing', action='store_true', default=False, help='disables indexing of selected AUs')
-  parser.add_option('--host', action='append', default=list(), help='adds host:port pair to the list of hosts')
-  parser.add_option('--hosts', action='append', default=list(), metavar='HFILE', help='adds host:port pairs from HFILE to the list of hosts')
-  parser.add_option('--keep-going', action='store_true', default=False, help='if an error occurs, go on to the next host')
-  parser.add_option('--password', metavar='PASS', help='UI password')
-  parser.add_option('--poll', action='store_true', default=False, help='calls poll on selected AUs')
-  parser.add_option('--reindex-metadata', action='store_true', default=False, help='requests metadata reindexing of selected AUs')
-  parser.add_option('--reload-config', action='store_true', default=False, help='causes the config to be reloaded')
-  parser.add_option('--username', metavar='USER', help='UI username')
-  parser.add_option('--wait', type='int', default=Options.WAIT, metavar='SEC', help='wait SEC seconds between requests (default %default)')
-  return parser
+    def __init__(self, parser, opts, args):
+        super(_DebugPanelOptions, self).__init__()
+        # --copyright, --license, --tutorial (--help already taken care of)
+        if any([opts.copyright, opts.license, opts.tutorial]):
+            if opts.copyright: print __copyright__
+            elif opts.license: print __license__
+            elif opts.tutorial: print __tutorial__
+            else: raise RuntimeError, 'internal error'
+            sys.exit()
+        # check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reindex_metadata, reload_config
+        flds = ['check_substance', 'crawl', 'crawl_plugins', 'deep_crawl', 'disable_indexing', 'poll', 'reindex_metadata', 'reload_config']
+        if len(filter(None, [getattr(opts, fld) for fld in flds])) != 1:
+            parser.error('exactly one of %s is required' % (', '.join(['--%s' % (fld.replace('_', '-')) for fld in flds])))
+        for fld in flds:
+            setattr(self, fld, getattr(opts, fld))
+        # hosts
+        self.hosts = opts.host[:]
+        for fstr in opts.hosts:
+            self.hosts.extend(_file_lines(fstr))
+        if len(self.hosts) == 0:
+            parser.error('at least one target host is required')
+        # auids
+        flds = ['check_substance', 'crawl', 'deep_crawl', 'disable_indexing', 'poll', 'reindex_metadata']
+        if any([getattr(opts, fld) for fld in flds]):
+            self.auids = opts.auid[:]
+            for fstr in opts.auids:
+                self.auids.extend(_file_lines(fstr))
+            if len(self.auids) == 0:
+                parser.error('at least one target AUID is required')
+        elif len(opts.auid) + len(opts.auids) > 0:
+            parser.error('--auid, --auids only valid with %s' % (', '.join(['--%s' % (fld.replace('_', '-')) for fld in flds])))
+        # depth, keep_going, pool_size, wait
+        if opts.pool_size < 0:
+            parser.error('invalid pool size: %d' % (opts.pool_size,))
+        if opts.wait < 0:
+            parser.error('invalid wait duration: %d' % (opts.wait,))
+        for fld in ['depth', 'keep_going', 'pool_size', 'wait']:
+            setattr(self, fld, getattr(opts, fld))
+        # pool_class, pool_size
+        if opts.process_pool and opts.thread_pool:
+            parser.error('--process-pool and --thread-pool are mutually exclusive')
+        self.pool_class = ProcessPool if opts.process_pool else ThreadPool
+        self.pool_size = opts.pool_size or len(self.hosts)
+        # auth
+        u = opts.username or getpass.getpass('UI username: ')
+        p = opts.password or getpass.getpass('UI password: ')
+        self.auth = base64.encodestring('%s:%s' % (u, p)).replace('\n', '')
 
-def process_options(parser, opts, args):
-  options = Options()
-  if not any([opts.check_substance, opts.crawl, opts.crawl_plugins, opts.deep_crawl, opts.disable_indexing, opts.poll, opts.reindex_metadata, opts.reload_config]):
-    parser.error('At least one of --check-substance, --crawl, --crawl-plugins, --deep-crawl, --disable-indexing, --poll, --reindex-metadata, --reload-config is required')
-  if len(opts.host) + len(opts.hosts) == 0: parser.error('At least one host is required')
-  options.add_hosts(opts.host)
-  for f in opts.hosts: options.add_hosts(_file_lines(f))
-  options.set_crawl_plugins(opts.crawl_plugins)
-  options.set_reload_config(opts.reload_config)
-  if any([opts.check_substance, opts.crawl, opts.deep_crawl, opts.disable_indexing, opts.poll, opts.reindex_metadata]) and len(args) + len(opts.auid) + len(opts.auids) == 0:
-    parser.error('For --check-substance, --crawl, --deep-crawl, --disable-indexing, --poll, --reindex-metadata, at least one AUID is required')
-  options.add_auids(args)
-  options.add_auids(opts.auid[:])
-  for f in opts.auids: options.add_auids(_file_lines(f))
-  options.set_check_substance(opts.check_substance)
-  options.set_crawl(opts.crawl)
-  options.set_deep_crawl(opts.deep_crawl)
-  options.set_disable_indexing(opts.disable_indexing)
-  options.set_poll(opts.poll)
-  options.set_reindex_metadata(opts.reindex_metadata)
-  options.set_depth(opts.depth)
-  options.set_keep_going(opts.keep_going)
-  options.set_wait(opts.wait)
-  if opts.username is None: u = raw_input('UI username: ')
-  else: u = opts.username
-  if opts.password is None: p = getpass.getpass('UI password: ')
-  else: p = opts.password
-  options.set_auth(base64.encodestring('%s:%s' % (u, p)).replace('\n', ''))
-  return options
-
-def do_crawl_plugins(options, host):
-  do_per_host(options, host, 'Crawl Plugins')
-
-def do_reload_config(options, host):
-  do_per_host(options, host, 'Reload Config')
-
-def do_per_host(options, host, action):
-  maybe_sleep(options)
-  action_enc = action.replace(' ', '%20')
-  req = make_request(options, host, 'action=%s' % (action_enc,))
-  execute_request(req, host)
-
-def do_check_substance(options, host, auid):
-  do_per_auid(options, host, 'Check Substance', auid)
-
-def do_crawl(options, host, auid):
-  do_per_auid(options, host, 'Force Start Crawl', auid)
-
-def do_deep_crawl(options, host, auid):
-  do_per_auid(options, host, 'Force Deep Crawl', auid, depth=options.get_depth())
-
-def do_disable_indexing(options, host, auid):
-  do_per_auid(options, host, 'Disable Indexing', auid)
-
-def do_poll(options, host, auid):
-  do_per_auid(options, host, 'Start V3 Poll', auid)
-
-def do_reindex_metadata(options, host, auid):
-  do_per_auid(options, host, 'Force Reindex Metadata', auid)
-
-def do_per_auid(options, host, action, auid, **kwargs):
-  maybe_sleep(options)
-  action_enc = action.replace(' ', '%20')
-  auid_enc = auid.replace('%', '%25').replace('|', '%7C').replace('&', '%26').replace('~', '%7E')
-  req = make_request(options, host, 'action=%s&auid=%s' % (action_enc, auid_enc), **kwargs)
-  execute_request(req, host)
-
-def maybe_sleep(options):
-  global must_sleep
-  if must_sleep: time.sleep(options.get_wait())
-  must_sleep = True
-
-def make_request(options, host, query, **kwargs):
+def _make_request(options, host, query, **kwargs):
   for k, v in kwargs.iteritems(): query = '%s&%s=%s' % (query, k, v)
   req = urllib2.Request('http://%s/DebugPanel?%s' % (host, query))
-  req.add_header('Authorization', 'Basic %s' % options.get_auth())
+  req.add_header('Authorization', 'Basic %s' % options.auth)
   return req
 
-def execute_request(req, host):
-  try: return urllib2.urlopen(req)
-  except urllib2.URLError as e:
-    raise Exception, 'Error: %s: %s' % (host, e.reason)
-  except urllib2.HTTPError as e:
-    if e.code == 401: raise Exception, 'Error: %s: bad username or password (HTTP 401)' % (host,)
-    else: raise Exception, 'Error: %s: HTTP %d' % (host, e.code)
+def _execute_request(req, host):
+    try: return urllib2.urlopen(req)
+    except urllib2.HTTPError as e:
+        if e.code == 401: raise Exception, 'Error: %s: bad username or password (HTTP 401)' % (host,)
+        elif e.code == 403: raise Exception, 'Error: %s: not allowed from this IP address (HTTP 403)' % (host,)
+        else: raise Exception, 'Error: %s: HTTP %d' % (host, e.code)
+    except urllib2.URLError as e:
+        raise Exception, 'Error: %s: %s' % (host, e.reason)
+
+def _do_per_auid(options, host, action, auid, **kwargs):
+    action_enc = action.replace(' ', '%20')
+    auid_enc = auid.replace('%', '%25').replace('|', '%7C').replace('&', '%26').replace('~', '%7E')
+    req = _make_request(options, host, 'action=%s&auid=%s' % (action_enc, auid_enc), **kwargs)
+    _execute_request(req, host)
+
+def _do_per_host(options, host, action):
+    action_enc = action.replace(' ', '%20')
+    req = _make_request(options, host, 'action=%s' % (action_enc,))
+    _execute_request(req, host)
+
+def _do_per_auid_job(options_host):
+    options, host = options_host
+    kwargs = dict()
+    if options.check_substance: action = 'Check Substance'
+    elif options.crawl: action = 'Force Start Crawl'
+    elif options.deep_crawl: action, kwargs = 'Force Deep Crawl', {'depth':options.depth}
+    elif options.disable_indexing: action = 'Disable Indexing'
+    elif options.poll: action = 'Start V3 Poll'
+    elif options.reindex_metadata: action = 'Force Reindex Metadata'
+    else: raise RuntimeError, 'internal error'
+    try:
+        sleep = False
+        for auid in options.auids:
+            if sleep: time.sleep(options.wait)
+            sleep = options.wait > 0
+            _do_per_auid(options, host, action, auid, **kwargs)
+        return (host, True)
+    except:
+        return (host, False)
+
+def _do_per_host_job(options_host):
+    options, host = options_host
+    if options.crawl_plugins: action = 'Crawl Plugins'
+    elif options.reload_config: action = 'Reload Config'
+    else: raise RuntimeError, 'internal error'
+    try:
+        _do_per_host(options, host, action)
+        return (host, True)
+    except Exception as e:
+        print e
+        return (host, False)
+
+def _do_debug_panel(options):
+  pool = options.pool_class(options.pool_size)
+  if options.crawl_plugins or options.reload_config:
+      func = _do_per_host_job
+  elif options.check_substance or options.crawl or options.deep_crawl \
+        or options.disable_indexing or options.poll or options.reindex_metadata:
+      func = _do_per_auid_job
+  else: raise RuntimeError, 'internal error'
+  jobs = [(options, host) for host in options.hosts]
+  for host, result in pool.imap_unordered(func, jobs):
+      if result is False:
+          sys.stderr.write('Error: unhandled exception with %s\n' % (host,))
+          if not options.keep_going:
+              sys.exit(1)
 
 # Last modified 2015-08-31
 def _file_lines(fstr):
@@ -250,22 +273,18 @@ def _file_lines(fstr):
   if len(ret) == 0: sys.exit('Error: %s contains no meaningful lines' % (fstr,))
   return ret
 
-if __name__ == '__main__':
-  parser = make_parser()
-  (opts, args) = parser.parse_args()
-  options = process_options(parser, opts, args)
-  for host in options.get_hosts():
-    try:
-      if options.is_crawl_plugins(): do_crawl_plugins(options, host)
-      if options.is_reload_config(): do_reload_config(options, host)
-      for auid in options.get_auids():
-        if options.is_check_substance(): do_check_substance(options, host, auid)
-        if options.is_crawl(): do_crawl(options, host, auid)
-        if options.is_deep_crawl(): do_deep_crawl(options, host, auid)
-        if options.is_disable_indexing(): do_disable_indexing(options, host, auid)
-        if options.is_poll(): do_poll(options, host, auid)
-        if options.is_reindex_metadata(): do_reindex_metadata(options, host, auid)
-    except Exception as e:
-      if not options.is_keep_going(): raise
-      print str(e)
+def _main():
+    '''Main method.'''
+    parser = _DebugPanelOptions.make_parser()
+    (opts, args) = parser.parse_args()
+    options = _DebugPanelOptions(parser, opts, args)
+    t = Thread(target=_do_debug_panel, args=(options,))
+    t.daemon = True
+    t.start()
+    while True:
+        t.join(1.0)
+        if not t.is_alive(): break
+
+# Main entry point
+if __name__ == '__main__': _main()
 
