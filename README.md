@@ -41,12 +41,10 @@ Pull from Git (`git pull`) in `$WORKDIR`.
 Files
 =====
 
-* `debugpanel.py`
-
+* `debugpanel.py`  
   The main implementation of this project.
 
-* `debugpanel`
-
+* `debugpanel`  
   A Shell script that calls `debugpanel.py`.
 
 License
