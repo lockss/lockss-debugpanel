@@ -22,7 +22,9 @@ Installation
 
   * Invoke as `debugpanel`.
 
-* Alternatively, invoke `$WORKDIR/debugpanel` directly.
+* Alternatively:
+ 
+  * Invoke as `$WORKDIR/debugpanel` directly.
 
 Usage
 =====
