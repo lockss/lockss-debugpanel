@@ -2,9 +2,8 @@
 
 '''A script to interact with the LOCKSS daemon's DebugPanel servlet.'''
 
-
 __copyright__ = '''\
-Copyright (c) 2000-2016, Board of Trustees of Leland Stanford Jr. University
+Copyright (c) 2000-2017, Board of Trustees of Leland Stanford Jr. University
 All rights reserved.'''
 
 __license__ = '''\
@@ -110,9 +109,9 @@ class _DebugPanelOptions(object):
         # Create parser
         usage = '%prog {OPERATION} {--host=HOST|--hosts=HFILE}... [--auid=AUID|--auids=AFILE]... [OPTIONS]...'
         parser = OptionParser(version=__version__, description=__doc__, usage=usage)
-        parser.add_option('--copyright', action='store_true', help='show copyright and exit')
-        parser.add_option('--license', action='store_true', help='show license and exit')
-        parser.add_option('--tutorial', action='store_true', help='show tutorial and exit')
+        parser.add_option('--copyright', '-C', action='store_true', help='show copyright and exit')
+        parser.add_option('--license', '-L', action='store_true', help='show license and exit')
+        parser.add_option('--tutorial', '-T', action='store_true', help='show tutorial and exit')
         # Operations
         group = OptionGroup(parser, 'Operations')
         group.add_option('--check-substance', action='store_true', help='request substance check of AUs')
@@ -154,7 +153,7 @@ class _DebugPanelOptions(object):
 
     def __init__(self, parser, opts, args):
         super(_DebugPanelOptions, self).__init__()
-        # --copyright, --license, --tutorial (--help already taken care of)
+        # --copyright, --license, --tutorial (--help, --version already taken care of)
         if any([opts.copyright, opts.license, opts.tutorial]):
             if opts.copyright: print __copyright__
             elif opts.license: print __license__
