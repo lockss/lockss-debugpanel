@@ -4,64 +4,91 @@ DebugPanel servlet programmatically.
 Pre-Requisites
 ==============
 
-* Python 2 invocable as `python2`. If you do not have a `python2` executable:
+*   Python 2 invocable as `python2`. If you have a `python` executable but not a
+    `python2` alias:
 
-  * Create a `bin` directory in your home directory if necessary:
-    `mkdir $HOME/bin`
-  
-  * Add `$HOME/bin` to your `PATH` if necessary (check with `echo $PATH`)
-  
-  * Create a `python2` symbolic link to a Python 2 interpreter in `$HOME/bin`:
-    `ln -s /path/to/python $HOME/bin/python2`
+    *   For a single user: create `$HOME/bin` and add it to the `$PATH` if
+        needed, then:
+
+        ```
+        ln -s /path/to/python2exec $HOME/bin/python2
+        ```
+
+    *   For all users (as root):
+
+        ```
+        ln -s /path/to/python2exec /usr/local/bin/python2
+        ```
 
 Installation
 ============
 
-* Clone this Git repository in a working directory `$WORKDIR`:
-  `cd $WORKDIR && git clone https://gitlab.lockss.org/lockss/debugpanel`
+*   Clone this Git repository into an installation directory (`$INSTALLDIR`):
 
-* Recommended:
+    *   For a single user, for instance where `$INSTALLDIR` is `$HOME/software`:
 
-  * Create a `bin` directory in your home directory if necessary:
-    `mkdir $HOME/bin`
-  
-  * Add `$HOME/bin` to your `PATH` if necessary (check with `echo $PATH`)
-  
-  * Create a symbolic link to `$WORKDIR/debugpanel/debugpanel` in `$HOME/bin`:
-    `ln -s $WORKDIR/debugpanel/debugpanel $HOME/bin`
+        ```
+        cd $HOME/software
+        git clone git@gitlab.lockss.org:lockss/debugpanel
+        ```
 
-  * Invoke as `debugpanel`.
+    *   For all users (as root):
 
-* Alternatively:
- 
-  * Invoke as `$WORKDIR/debugpanel/debugpanel` directly.
+        ```
+        cd /usr/local/share
+        git clone git@gitlab.lockss.org:lockss/debugpanel
+        ```
+
+*   Create a symbolic link to `debugpanel`:
+
+    *   For a single user, for instance where `$INSTALLDIR` is `$HOME/software`:
+        create `$HOME/bin` and add it to the `$PATH` if needed, then:
+
+        ```
+        ln -s $HOME/software/debugpanel/debugpanel $HOME/bin/
+        ```
+
+    *   For all users (as root):
+
+        ```
+        ln -s /usr/local/share/debugpanel/debugpanel /usr/local/bin/
+        ```
 
 Usage
 =====
 
-`debugpanel --help` displays a summary of commands and options.
+*   ```
+    debugpanel --help
+    ```
 
-`debugpanel --tutorial` displays a usage tutorial.
+    Displays a summary of commands and options.
+
+*   ```
+    debugpanel --tutorial
+    ```
+
+    Displays a usage tutorial.
 
 Upgrade
 =======
 
-Pull from Git in `$WORKDIR/debugpanel`:
-`cd $WORKDIR/debugpanel && git pull`
-
-`debugpanel --version` displays the current version number.
+Pull from Git (`git pull`) in `$INSTALLDIR/debugpanel`. Use
+`debugpanel --version` to verify the version number after.
 
 Files
 =====
 
-* `debugpanel.py`  
-  The main implementation of this project.
+*   [`debugpanel`](debugpanel)
 
-* `debugpanel`  
-  A Shell script that calls `debugpanel.py`.
+    The point of entry of this project.
+
+*   [`debugpanel.py`](debugpanel.py)
+
+    The Python implementation of this project.
 
 License
 =======
 
-See the `LICENSE` file, or invoke `debugpanel --license` and
+See the [LICENSE](LICENSE) file, or invoke `debugpanel --license` and
 `debugpanel --copyright`.
+

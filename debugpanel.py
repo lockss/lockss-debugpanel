@@ -3,7 +3,7 @@
 '''A script to interact with the LOCKSS daemon's DebugPanel servlet.'''
 
 __copyright__ = '''\
-Copyright (c) 2000-2017, Board of Trustees of Leland Stanford Jr. University
+Copyright (c) 2000, Board of Trustees of Leland Stanford Jr. University.
 All rights reserved.'''
 
 __license__ = '''\
@@ -37,14 +37,15 @@ __version__ = '0.3.1'
 __tutorial__ = '''\
 TUTORIAL
 
-A list of hosts is built up by accumulating host:port pairs passed with --host
-and host:port pairs read from files passed with --hosts.
+A list of target hosts is built up by accumulating host:port pairs passed with
+--host and host:port pairs read from files passed with --hosts.
 
-If a username is passed with --username, use it to connect to hosts, otherwise
-prompt for one interactively. Likewise, if a password is passed with
---password, use it to connect to hosts, otherwise prompt for one interactively.
+If a username is passed with --username, it is used to connect to target hosts,
+otherwise an interactive prompt asks for one. Likewise, if a password is passed
+with --password, it is used to connect to hosts, otherwise an interactive prompt
+asks for one.
 
-Operations that can be applied to each host include:
+Operations that can be applied to each target host include:
 
   --crawl-plugins
       Causes the daemon to recrawl plugin registries.
@@ -52,11 +53,11 @@ Operations that can be applied to each host include:
   --reload-config
       Causes the daemon to reload its config.
 
-Other operations are applied to specific AUs. A list of AUIDs is built up by
-accumulating those passed via --auid and those read from files passed with
+Other operations are applied to specific AUs. A list of target AUIDs is built up
+by accumulating those passed via --auid and those read from files passed with
 --auids.
 
-Operations that can be applied to each AU of each host include:
+Operations that can be applied to each target AU of each target host include:
 
   --check-substance
       Requests a substance check of the AU.
@@ -77,15 +78,19 @@ Operations that can be applied to each AU of each host include:
   --reindex-metadata
       Requests reindexing of the metadata of the AU.
 
-A certain number of hosts (based on the value of --pool-size) are processed in
-parallel, possibly all at the same time (if the value is zero),  each in a
-separate thread (unless --process-pool is specified, in which case each in a
-separate process).
+Up to the number of target hosts passed with --pool-size is processed in
+parallel; by default (or if a value of 0 is passed), all the target hosts in
+parallel. Each is processed in its own thread by default or if --thread-pool is
+specified, or in its own process if --process-pool is specified.
 
-You can specify a number of seconds to wait between requests to each host with
---wait.
+You can specify a number of seconds to wait between requests to each target host
+with --wait.
 
 The --debug options causes verbose error messages to be displayed to stderr.
+
+An error causes the program to exit, unless --keep-going is specified, in which
+case processing for the offending target host ends prematurely but processing
+for the other target hosts continues.
 '''
 
 import base64
