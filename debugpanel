@@ -33,14 +33,14 @@ if which realpath > /dev/null ; then
 elif which grealpath > /dev/null ; then
   REALPATH=grealpath
 else
-  echo "${0}: core command line utility realpath (or grealpath) not found" >&2
+  echo "${0}: realpath (or grealpath) not found" >&2
   exit 1
 fi
-if which python2 > /dev/null ; then
-  PYTHON2=python2
-else
-  echo "${0}: python2 executable or symbolic link not found" >&2
+
+if ! which python2 > /dev/null ; then
+  echo "${0}: python2 not found" >&2
   exit 1
 fi
-$PYTHON2 $(dirname $($REALPATH $0))/$(basename $0).py "$@"
+
+python2 $(dirname $($REALPATH $0))/$(basename $0).py "$@"
 
