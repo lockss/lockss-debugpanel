@@ -4,3 +4,8 @@
 # Python artifacts
 *.pyc
 *.pyo
+
+# Temporary files
+*.bak
+*.tmp
+tmp*
