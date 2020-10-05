@@ -4,55 +4,44 @@ DebugPanel servlet programmatically.
 Pre-Requisites
 ==============
 
-*   Python 2 invocable as `python2`. If you have a `python` executable but not a
-    `python2` alias:
-
-    *   For a single user: create `$HOME/bin` and add it to the `$PATH` if
-        needed, then:
-
-        ```
-        ln -s /path/to/python2exec $HOME/bin/python2
-        ```
-
-    *   For all users (as root):
-
-        ```
-        ln -s /path/to/python2exec /usr/local/bin/python2
-        ```
+*   Python 3 invocable as `python3` or `python`.
 
 Installation
 ============
 
-*   Clone this Git repository into an installation directory (`$INSTALLDIR`):
+1.  Clone this Git repository into an installation directory `$INSTALLDIR`,
+    for instance `$HOME/software`:
+    
+    ```
+    cd $INSTALLDIR
+    git clone git@code.stanford.edu:lockss/tools/debugpanel
+    ```
+    
+    This creates a `debugpanel` directory in `$INSTALLDIR`, in which you will
+    find the `debugpanel` shell script and the `debugpanel.py` Python script.
 
-    *   For a single user, for instance where `$INSTALLDIR` is `$HOME/software`:
+1.  Create a symbolic link to the `debugpanel` shell script (i.e.
+    `$INSTALLDIR/debugpanel/debugpanel`) in a PATH directory `$BINDIR`, for
+    example `$HOME/bin`:
+    
+    ```
+    ln -s $INSTALLDIR/debugpanel/debugpanel $BINDIR
+    ```
 
-        ```
-        cd $HOME/software
-        git clone git@gitlab.lockss.org:lockss/debugpanel
-        ```
-
-    *   For all users (as root):
-
-        ```
-        cd /usr/local/share
-        git clone git@gitlab.lockss.org:lockss/debugpanel
-        ```
-
-*   Create a symbolic link to `debugpanel`:
-
-    *   For a single user, for instance where `$INSTALLDIR` is `$HOME/software`:
-        create `$HOME/bin` and add it to the `$PATH` if needed, then:
-
-        ```
-        ln -s $HOME/software/debugpanel/debugpanel $HOME/bin/
-        ```
-
-    *   For all users (as root):
-
-        ```
-        ln -s /usr/local/share/debugpanel/debugpanel /usr/local/bin/
-        ```
+1.  `$BINDIR` must be on the PATH. For interactive command line use, this means
+    that `$BINDIR` must appear in the semicolon-separated list displayed when
+    you type `echo $PATH`. If it does not appear, you can alter your shell
+    startup scripts to add it in all future shell sessions. For instance in a
+    Bash environment, you can add this to `$HOME/.bashrc`:
+    
+    ```
+    export PATH=$HOME/bin:$PATH
+    ```
+    
+    For non-interactive enironments like `cron` jobs, be mindful that the PATH
+    typically does not include much by default. You can add `$BINDIR` to the
+    PATH seen by `cron`, or you can write `cron` jobs that explicitly invoke
+    `debugpanel` by its full path (the expansion of `$BINDIR/debugpanel`).
 
 Usage
 =====
@@ -62,12 +51,6 @@ Usage
     ```
 
     Displays a summary of commands and options.
-
-*   ```
-    debugpanel --tutorial
-    ```
-
-    Displays a usage tutorial.
 
 Upgrade
 =======
