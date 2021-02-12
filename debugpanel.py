@@ -3,7 +3,7 @@
 '''A script to interact with the LOCKSS daemon's DebugPanel servlet.'''
 
 __copyright__ = '''\
-Copyright (c) 2000-2020, Board of Trustees of Leland Stanford Jr. University.
+Copyright (c) 2000-2021, Board of Trustees of Leland Stanford Jr. University.
 All rights reserved.'''
 
 __license__ = '''\
@@ -32,7 +32,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.'''
 
-__version__ = '0.4.0'
+__version__ = '0.4.1'
 
 __tutorial__ = '''\
 TUTORIAL
@@ -199,12 +199,12 @@ class _DebugPanelOptions(object):
         # auth
         u = args.username or getpass.getpass('UI username: ')
         p = args.password or getpass.getpass('UI password: ')
-        self.auth = base64.b64encode(f'{u}:{p}'.encode('utf-8')).decode('utf-8')
+        self.auth = base64.b64encode('{}:{}'.format(u, p).encode('utf-8')).decode('utf-8')
 
 def _make_request(options, host, query, **kwargs):
-    for k, v in kwargs.items(): query = f'{query}&{k}={v}'
-    url = f'http://{host}/DebugPanel?{query}'
-    req = urllib.request.Request(url, headers={'Authorization': f'Basic {options.auth}'})
+    for k, v in kwargs.items(): query = '{}&{}={}'.format(query, k, v)
+    url = 'http://{}/DebugPanel?{}'.format(host, query)
+    req = urllib.request.Request(url, headers={'Authorization': 'Basic {}'.format(options.auth)})
     return req
 
 def _execute_request(req):
@@ -216,19 +216,19 @@ def _execute_request(req):
         elif e.code == 403:
             raise Exception('not allowed from this IP address (HTTP 403)') from e
         else:
-            raise Exception(f'HTTP {e.code} error: {e.reason}') from e
+            raise Exception('HTTP {} error: {}'.format(e.code, e.reason)) from e
     except urllib.error.URLError as e:
-        raise Exception(f'URL error: {e.reason}') from e
+        raise Exception('URL error: {}'.format(e.reason)) from e
 
 def _do_per_auid(options, host, action, auid, **kwargs):
     action_enc = action.replace(' ', '%20')
     auid_enc = auid.replace('%', '%25').replace('|', '%7C').replace('&', '%26').replace('~', '%7E')
-    req = _make_request(options, host, f'action={action_enc}&auid={auid_enc}', **kwargs)
+    req = _make_request(options, host, 'action={}&auid={}'.format(action_enc, auid_enc), **kwargs)
     _execute_request(req)
 
 def _do_per_host(options, host, action):
     action_enc = action.replace(' ', '%20')
-    req = _make_request(options, host, f'action={action_enc}')
+    req = _make_request(options, host, 'action={}'.format(action_enc))
     _execute_request(req)
 
 def _do_per_auid_job(options_host):
@@ -282,7 +282,7 @@ def _do_debug_panel(options):
   for host, error in pool.imap_unordered(func, jobs):
       if error is not None:
           _STDERR_LOCK.acquire()
-          sys.stderr.write(f'{host}: {str(error)}\n')
+          sys.stderr.write('{}: {}\n'.format(host, str(error)))
           _STDERR_LOCK.release()
           if not options.keep_going:
               sys.exit(1)
@@ -290,7 +290,7 @@ def _do_debug_panel(options):
 # Last modified 2020-10-01
 def _file_lines(fstr):
     with open(os.path.expanduser(fstr)) as f: ret = list(filter(lambda y: len(y) > 0, [x.partition('#')[0].strip() for x in f]))
-    if len(ret) == 0: sys.exit(f'Error: {fstr} contains no meaningful lines')
+    if len(ret) == 0: sys.exit('Error: {} contains no meaningful lines'.format(fstr))
     return ret
 
 def _main():
