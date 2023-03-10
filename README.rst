@@ -10,7 +10,7 @@ Debugpanel
 
 Debugpanel is a tool to interact with the LOCKSS 1.x DebugPanel servlet.
 
-**Latest release:** 0.4.0-dev1 (?)
+**Latest release:** 0.5.0-dev2 (?)
 
 -------------
 Prerequisites
