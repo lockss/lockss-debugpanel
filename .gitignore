@@ -1,9 +1,13 @@
+# PyCharm artifacts
+/.idea/
+
 # Eclipse artifacts
 /.project
 
-# Python artifacts
-*.pyc
-*.pyo
+# Python and Poetry artifacts
+/dist/
+/**/*.pyc
+/**/*.pyo
 
 # Temporary files
 *.bak
