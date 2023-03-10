@@ -6,7 +6,7 @@ license = "BSD-3-Clause"
 authors = [
     "Thib Guicherd-Callin <thib@cs.stanford.edu>"
 ]
-readme = "README.md"
+readme = "README.rst"
 homepage = "https://www.lockss.org/"
 repository = "https://code.stanford.edu/lockss/tools/debugpanel"
 classifiers = [
