@@ -10,13 +10,17 @@ Debugpanel
 
 Debugpanel is a tool to interact with the LOCKSS 1.x DebugPanel servlet.
 
-**Latest release:** 0.5.0-dev2 (?)
+**Latest release:** 0.5.0-dev3 (?)
 
 -------------
 Prerequisites
 -------------
 
-*  `Python <https://www.python.org/>`_ 3.7 or greater.
+*  `Python <https://www.python.org/>`_ 3.6 or greater.
+
+Prerequisites for development work only:
+
+*  `Poetry <https://python-poetry.org/>`_ 1.4 or greater.
 
 ------------
 Installation
