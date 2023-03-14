@@ -65,8 +65,44 @@ POSSIBILITY OF SUCH DAMAGE.
 import base64
 import urllib.request
 
-def reload_config(node_object, **kwargs):
-    _node_action(node_object)
+
+DEFAULT_DEPTH = 123
+
+def check_substance(node_object, auid):
+    return _auid_action(node_object, auid, 'Check Substance')
+
+
+def crawl(node_object, auid):
+    return _auid_action(node_object, auid, 'Force Start Crawl')
+
+
+def crawl_plugins(node_object):
+    return _node_action(node_object, 'Crawl Plugins')
+
+
+def deep_crawl(node_object, auid, depth=DEFAULT_DEPTH):
+    return _auid_action(node_object, auid, 'Force Deep Crawl', depth=depth)
+
+
+def disable_indexing(node_object, auid):
+    return _auid_action(node_object, auid, 'Disable Indexing')
+
+
+def poll(node_object, auid):
+    return _auid_action(node_object, auid, 'Start V3 Poll')
+
+
+def reindex_metadata(node_object, auid):
+    return _auid_action(node_object, auid, 'Force Reindex Metadata')
+
+
+def reload_config(node_object):
+    return _node_action(node_object, 'Reload Config')
+
+
+def validate_files(node_object, auid):
+    return _auid_action(node_object, auid, 'Validate Files')
+
 
 class _Node(object):
 
@@ -87,11 +123,13 @@ class _Node(object):
     def get_url(self):
         return self._url
 
-def _execute_request(req, **kwargs):
-    try:
-        return urllib.request.urlopen(req)
-    except Exception as exc:
-        raise Exception(exc).with_traceback(exc.__traceback__)
+
+def _auid_action(node_object, auid, action):
+    action_encoded = action.replace(" ", "%20")
+    auid_encoded = auid.replace('%', '%25').replace('|', '%7C').replace('&', '%26').replace('~', '%7E')
+    req = _make_request(node_object, f'action={action_encoded}&auid={auid_encoded}')
+    return urllib.request.urlopen(req)
+
 
 def _make_request(node_object, query, **kwargs):
     for key, val in kwargs.items():
@@ -101,7 +139,8 @@ def _make_request(node_object, query, **kwargs):
     node_object.authenticate(req)
     return req
 
-def _node_action(node_object, action, **kwargs):
-    action_encoded = action.replace(" ", "%20")
-    req = _make_request(node_object, f'action={action_encoded}', **kwargs)
 
+def _node_action(node_object, action):
+    action_encoded = action.replace(" ", "%20")
+    req = _make_request(node_object, f'action={action_encoded}')
+    return urllib.request.urlopen(req)
