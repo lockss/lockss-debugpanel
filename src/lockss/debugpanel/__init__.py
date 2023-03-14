@@ -61,3 +61,47 @@ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 '''.strip()
+
+import base64
+import urllib.request
+
+def reload_config(node_object, **kwargs):
+    _node_action(node_object)
+
+class _Node(object):
+
+    DEFAULT_PROTOCOL = 'http'
+
+    def __init__(self, hostport, u, p):
+        super().__init__()
+        if '://' not in hostport:
+            hostport = f'{_Node.DEFAULT_PROTOCOL}://{hostport}'
+        if hostport.endswith('/'):
+            hostport = hostport[:-1]
+        self._url = hostport
+        self._basic = base64.b64encode(f'{u}:{p}'.encode('utf-8')).decode('utf-8')
+
+    def authenticate(self, req):
+        req.add_header('Authorization', f'Basic {self._basic}')
+
+    def get_url(self):
+        return self._url
+
+def _execute_request(req, **kwargs):
+    try:
+        return urllib.request.urlopen(req)
+    except Exception as exc:
+        raise Exception(exc).with_traceback(exc.__traceback__)
+
+def _make_request(node_object, query, **kwargs):
+    for key, val in kwargs.items():
+        query = f'{query}&{key}={val}'
+    url = f'{node_object.get_url()}/DebugPanel?{query}'
+    req = urllib.request.Request(url)
+    node_object.authenticate(req)
+    return req
+
+def _node_action(node_object, action, **kwargs):
+    action_encoded = action.replace(" ", "%20")
+    req = _make_request(node_object, f'action={action_encoded}', **kwargs)
+
