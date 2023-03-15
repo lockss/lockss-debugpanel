@@ -68,6 +68,7 @@ import urllib.request
 
 DEFAULT_DEPTH = 123
 
+
 def check_substance(node_object, auid):
     return _auid_action(node_object, auid, 'Check Substance')
 
@@ -86,6 +87,10 @@ def deep_crawl(node_object, auid, depth=DEFAULT_DEPTH):
 
 def disable_indexing(node_object, auid):
     return _auid_action(node_object, auid, 'Disable Indexing')
+
+
+def node(node_reference, u, p):
+    return _Node(node_reference, u, p)
 
 
 def poll(node_object, auid):
@@ -108,13 +113,13 @@ class _Node(object):
 
     DEFAULT_PROTOCOL = 'http'
 
-    def __init__(self, hostport, u, p):
+    def __init__(self, node_reference, u, p):
         super().__init__()
-        if '://' not in hostport:
-            hostport = f'{_Node.DEFAULT_PROTOCOL}://{hostport}'
-        if hostport.endswith('/'):
-            hostport = hostport[:-1]
-        self._url = hostport
+        if '://' not in node_reference:
+            node_reference = f'{_Node.DEFAULT_PROTOCOL}://{node_reference}'
+        if node_reference.endswith('/'):
+            node_reference = node_reference[:-1]
+        self._url = node_reference
         self._basic = base64.b64encode(f'{u}:{p}'.encode('utf-8')).decode('utf-8')
 
     def authenticate(self, req):
@@ -124,10 +129,10 @@ class _Node(object):
         return self._url
 
 
-def _auid_action(node_object, auid, action):
+def _auid_action(node_object, auid, action, **kwargs):
     action_encoded = action.replace(" ", "%20")
     auid_encoded = auid.replace('%', '%25').replace('|', '%7C').replace('&', '%26').replace('~', '%7E')
-    req = _make_request(node_object, f'action={action_encoded}&auid={auid_encoded}')
+    req = _make_request(node_object, f'action={action_encoded}&auid={auid_encoded}', **kwargs)
     return urllib.request.urlopen(req)
 
 
@@ -140,7 +145,7 @@ def _make_request(node_object, query, **kwargs):
     return req
 
 
-def _node_action(node_object, action):
+def _node_action(node_object, action, **kwargs):
     action_encoded = action.replace(" ", "%20")
-    req = _make_request(node_object, f'action={action_encoded}')
+    req = _make_request(node_object, f'action={action_encoded}', **kwargs)
     return urllib.request.urlopen(req)

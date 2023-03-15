@@ -8,7 +8,7 @@ Debugpanel
 .. |NODE| replace:: ``--node/-n``
 .. |NODES| replace:: ``--nodes/-N``
 
-Debugpanel is a tool to interact with the LOCKSS 1.x DebugPanel servlet.
+Debugpanel is a library and command line tool to interact with the LOCKSS 1.x DebugPanel servlet.
 
 **Latest release:** 0.6.0-dev1 (?)
 
@@ -40,11 +40,79 @@ To install it in your own non-root, non-virtual environment, use the ``--user`` 
 
    Do not run ``pip3``/``pip`` as ``root``, with ``sudo`` or otherwise.
 
-The installation process adds a ``debugpanel`` executable to the ``PATH``; you can check that the installation is functional by running ``debugpanel version`` or ``debugpanel --help``.
+The installation process adds a ``lockss.debugpanel`` `Library`_ and a ``debugpanel`` `Command Line Tool`_. You can check at the command line that the installation is functional by running ``debugpanel version`` or ``debugpanel --help``.
 
-----------
-Invocation
-----------
+--------
+Overview
+--------
+
+Per-Node Operations
+===================
+
+You can use Debugpanel to get LOCKSS nodes to:
+
+*  Reload their configuration (`reload-config`_ command, ``lockss.debugpanel.reload_config()`` function).
+
+*  Crawl their plugins (`crawl-plugins`_ command, ``lockss.debugpanel.crawl_plugins()`` function).
+
+Per-AU Operations
+=================
+
+You can use Debugpanel to get LOCKSS nodes to perform an operation on AUs identified by AUID, namely:
+
+*  Crawl (`crawl`_ command, ``lockss.debugpanel.crawl()`` function).
+
+*  Crawl with depth (`deep-crawl`_ command, ``lockss.debugpanel.deep_crawl()`` function).
+
+*  Poll (`poll`_ command, ``lockss.debugpanel.poll()`` function).
+
+*  Check substance (`check-substance`_ command, ``lockss.debugpanel.check_substance()`` function).
+
+*  Validate files (`validate-files`_ command, ``lockss.debugpanel.validate_files()`` function).
+
+*  Reindex metadata (`reindex-metadata`_ command, ``lockss.debugpanel.reindex_metadata()`` function).
+
+*  Disable metadata indexing (`disable-indexing`_ command, ``lockss.debugpanel.disable_reindexing()`` function).
+
+-------
+Library
+-------
+
+You can use Debugpanel as a Python library.
+
+The ``lockss.debugpanel`` module's ``node()`` method can create a node object from a node reference (a string like ``host:8081``, ``http://host:8081``, ``http://host:8081/``, ``https://host:8081``, ``https://host:8081/``; no protocol defaults to ``http://``), a username, and a password.
+
+This node object can be used as the argument to ``crawl_plugins()`` or ``reload_config()``.
+
+It can also be used as the first argument to ``check_substance()``, ``crawl()``, ``deep_crawl()``, ``disable_indexing()``, ``poll()``, ``reindex_metadata()``, or ``validate_files``, together with an AUID string as the second argument.
+
+The ``deep_crawl()`` method has an optional third argument, ``depth``, for the crawl depth (whch defaults to ``lockss.debugpanel.DEFAULT_DEPTH``).
+
+All operations return the modified ``http.client.HTTPResponse`` object from ``urllib.request.urlopen()`` (see https://docs.python.org/3.7/library/urllib.request.html#urllib.request.urlopen). A status code of 200 indicates that the request to the node was made successfully (but not much else; for example if there is no such AUID for an AUID operation, nothing happens).
+
+Use of the module is illustrated in this example::
+
+    import getpass
+    import lockss.debugpanel
+
+    hostport = '...'
+    username = input('Username: ')
+    password = getpass.getpass('Password: ')
+    node = lockss.debugpanel.node(hostport, username, password)
+    auid = '...'
+
+    try:
+        resp = lockss.debugpanel.poll(node, auid)
+        if resp.status == 200:
+            print('Poll requested (200)')
+        else:
+            print(f'{resp.reason} ({resp.status})')
+    except Exception as exc:
+        print(f'Error: {exc!s}')
+
+-----------------
+Command Line Tool
+-----------------
 
 Debugpanel is invoked at the command line as::
 
@@ -130,41 +198,8 @@ Debugpanel uses `Commands`_, in the style of programs like ``git``, ``dnf``/``yu
 
            debugpanel version [-h]
 
--------------------
-Per-Node Operations
--------------------
-
-You can use Debugpanel `Commands`_ to get a set of LOCKSS nodes to reload their configuration (`reload-config`_ command) or crawl their plugins (`crawl-plugins`_ command).
-
-Node Arguments and Options
-==========================
-
-Commands for `Per-Node Operations`_ expect references to one or more nodes in ``HOST:PORT`` format, for instance ``lockss.myuniversity.edu:8081``. The list of nodes to process is derived from:
-
-*  The nodes listed as bare arguments to the command.
-
-*  The nodes listed as |NODE| options.
-
-*  The nodes found in the files listed as |NODES| options.
-
------------------
-Per-AU Operations
------------------
-
-You can use Debugpanel `Commands`_ to get a set of LOCKSS nodes to perform an operation on a set of AUs identified by AUID, namely crawling (`crawl`_ command), crawling with depth (`deep-crawl`_ command), polling (`poll`_ command), checking substance (`check-substance`_ command), validating files (`validate-files`_ command), reindexing metadata (`reindex-metadata`_ command), and disabling metadata indexing (`disable-indexing`_ command).
-
-AUID Options
-============
-
-In addition to `Node Arguments and Options`_, commands for `Per-AU Operations`_ expect one or more AUIDs. The list of AUIDs to target is derived from:
-
-*  The AUIDs listed as |AUID| options.
-
-*  The AUIDs found in the files listed as |AUIDS| options.
-
---------
 Commands
---------
+========
 
 The available commands are:
 
@@ -272,7 +307,7 @@ The command needs:
 
 *  One or more AUIDs, from the `AUID Options`_ (|AUID| options, |AUIDS| options).
 
-It also accepts `Common Options`_ for `Output Format Control`_ and `Job Pool Control`_.
+It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 
 .. _copyright:
 
@@ -330,7 +365,7 @@ The command needs:
 
 *  One or more AUIDs, from the `AUID Options`_ (|AUID| options, |AUIDS| options).
 
-It also accepts `Common Options`_ for `Output Format Control`_ and `Job Pool Control`_.
+It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 
 .. _crawl-plugins:
 
@@ -379,7 +414,7 @@ The command needs:
 
 *  One or more nodes, from the `Node Arguments and Options`_ (bare arguments, |NODE| options, |NODES| options).
 
-It also accepts `Common Options`_ for `Output Format Control`_ and `Job Pool Control`_.
+It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 
 .. _deep-crawl:
 
@@ -441,7 +476,7 @@ The command needs:
 
 It has a unique option, ``--depth/-d``, which is an integer specifying the desired crawl depth.
 
-It also accepts `Common Options`_ for `Output Format Control`_ and `Job Pool Control`_.
+It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 
 .. _disable-indexing:
 
@@ -499,7 +534,7 @@ The command needs:
 
 *  One or more AUIDs, from the `AUID Options`_ (|AUID| options, |AUIDS| options).
 
-It also accepts `Common Options`_ for `Output Format Control`_ and `Job Pool Control`_.
+It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 
 .. _license:
 
@@ -562,7 +597,7 @@ The command needs:
 
 *  One or more AUIDs, from the `AUID Options`_ (|AUID| options, |AUIDS| options).
 
-It also accepts `Common Options`_ for `Output Format Control`_ and `Job Pool Control`_.
+It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 
 .. _reindex-metadata:
 
@@ -620,7 +655,7 @@ The command needs:
 
 *  One or more AUIDs, from the `AUID Options`_ (|AUID| options, |AUIDS| options).
 
-It also accepts `Common Options`_ for `Output Format Control`_ and `Job Pool Control`_.
+It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 
 .. _reload-config:
 
@@ -669,7 +704,7 @@ The command needs:
 
 *  One or more nodes, from the `Node Arguments and Options`_ (bare arguments, |NODE| options, |NODES| options).
 
-It also accepts `Common Options`_ for `Output Format Control`_ and `Job Pool Control`_.
+It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 
 .. _usage:
 
@@ -733,7 +768,7 @@ The command needs:
 
 *  One or more AUIDs, from the `AUID Options`_ (|AUID| options, |AUIDS| options).
 
-It also accepts `Common Options`_ for `Output Format Control`_ and `Job Pool Control`_.
+It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 
 .. _version:
 
@@ -742,9 +777,29 @@ It also accepts `Common Options`_ for `Output Format Control`_ and `Job Pool Con
 
 The ``version`` command displays the version number of Debugpanel and exits.
 
---------------
-Common Options
---------------
+-------
+Options
+-------
+
+Node Arguments and Options
+==========================
+
+`Commands`_ for `Per-Node Operations`_ expect one or more node references in ``HOST:PORT`` format, for instance ``lockss.myuniversity.edu:8081``. The list of nodes to process is derived from:
+
+*  The nodes listed as bare arguments to the command.
+
+*  The nodes listed as |NODE| options.
+
+*  The nodes found in the files listed as |NODES| options.
+
+AUID Options
+============
+
+In addition to `Node Arguments and Options`_, `Commands`_ for `Per-AU Operations`_ expect one or more AUIDs. The list of AUIDs to target is derived from:
+
+*  The AUIDs listed as |AUID| options.
+
+*  The AUIDs found in the files listed as |AUIDS| options.
 
 Output Format Control
 =====================

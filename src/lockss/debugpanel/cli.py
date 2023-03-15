@@ -29,7 +29,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import base64
 import concurrent.futures
 import getpass
 import os
@@ -60,34 +59,30 @@ def _file_lines(path):
             f.close()
 
 
-def _do_per_auid(node, auid, action, auth, **kwargs):
-    action_encoded = action.replace(" ", "%20")
-    auid_encoded = auid.replace('%', '%25').replace('|', '%7C').replace('&', '%26').replace('~', '%7E')
-    req = _make_request(node, f'action={action_encoded}&auid={auid_encoded}', auth, **kwargs)
-    _execute_request(req)
-    return True
+def _do_per_auid(node_object, auid, target, **kwargs):
+    pickled = bool(kwargs.get('pickled'))
+    if pickled:
+        try:
+            ret = target(node_object, auid)
+            return (ret.status, ret.reason)
+        except Exception as exc:
+            raise Exception(str(exc)).with_traceback(exc.__traceback__)
+    else:
+        ret = target(node_object)
+        return (ret.status, ret)
 
 
-def _do_per_node(node, action, auth):
-    action_encoded = action.replace(" ", "%20")
-    req = _make_request(node, f'action={action_encoded}', auth)
-    _execute_request(req)
-    return True
-
-
-def _execute_request(req):
-    try:
-        return urllib.request.urlopen(req)
-    except Exception as exc:
-        raise Exception(exc).with_traceback(exc.__traceback__)
-
-
-def _make_request(node, query, auth, **kwargs):
-    for k, v in kwargs.items():
-        query = f'{query}&{k}={v}'
-    url = f'http://{node}/DebugPanel?{query}'
-    req = urllib.request.Request(url, headers={'Authorization': f'Basic {auth}'})
-    return req
+def _do_per_node(node_object, target, **kwargs):
+    pickled = bool(kwargs.get('pickled'))
+    if pickled:
+        try:
+            ret = target(node_object)
+            return (ret.status, ret.reason)
+        except Exception as exc:
+            raise Exception(str(exc)).with_traceback(exc.__traceback__)
+    else:
+        ret = target(node_object)
+        return (ret.status, ret)
 
 
 class DebugPanelCli(object):
@@ -142,9 +137,9 @@ class DebugPanelCli(object):
         return self._nodes
 
     def _initialize_auth(self):
-        u = self._args.username or input('UI username: ')
-        p = self._args.password or getpass.getpass('UI password: ')
-        self._auth = base64.b64encode(f'{u}:{p}'.encode('utf-8')).decode('utf-8')
+        _u = self._args.username or input('UI username: ')
+        _p = self._args.password or getpass.getpass('UI password: ')
+        self._auth = (_u, _p)
 
     def _initialize_executor(self):
         workers = self._args.pool_size if self._args.pool_size > 0 else None
@@ -320,7 +315,7 @@ class DebugPanelCli(object):
         parser = container.add_parser(option, aliases=aliases,
                                       description=description,
                                       help=help)
-        parser.set_defaults(fun=self._per_host)
+        parser.set_defaults(fun=self._per_node)
         parser.set_defaults(target=target)
         self._make_option_output_format(parser)
         self._make_options_nodes(parser)
@@ -357,7 +352,7 @@ class DebugPanelCli(object):
         self._make_parser_per_auid(container,
                                    'validate-files', ['vf'],
                                    'Cause nodes to run file validation on AUs',
-                                   'Cause nodes to run file validation on AUs',
+                                   'cause nodes to run file validation on AUs',
                                    lockss.debugpanel.validate_files)
 
     def _make_parser_version(self, container):
@@ -369,61 +364,41 @@ class DebugPanelCli(object):
     def _per_auid(self):
         self._initialize_auth()
         self._initialize_executor()
-        if self._args.command in ['check-substance', 'cs']:
-            action, kw = 'Check Substance', {}
-        elif self._args.command in ['crawl', 'cr']:
-            action, kw = 'Force Start Crawl', {}
-        elif self._args.command in ['deep-crawl', 'dc']:
-            action, kw = 'Force Deep Crawl', {'depth': self._args.depth}
-        elif self._args.command in ['disable-indexing', 'di']:
-            action, kw = 'Disable Indexing', {}
-        elif self._args.command in ['poll', 'po']:
-            action, kw = 'Start V3 Poll', {}
-        elif self._args.command in ['reindex-metadata', 'ri']:
-            action, kw = 'Force Reindex Metadata', {}
-        elif self._args.command in ['validate-files', 'vf']:
-            action, kw = 'Validate Files', {}
-        else:
-            raise RuntimeError(f'internal error: unknown command: {self._args.command}')
-        futures = {self._executor.submit(_do_per_auid, node, auid, action, self._auth, **kw): (node, auid) for auid in self._get_auids() for node in self._get_nodes()}
+        node_objects = [lockss.debugpanel.node(node, *self._auth) for node in self._get_nodes()]
+        futures = {self._executor.submit(_do_per_auid, node_object, auid, self._args.target, pickled=True): (node, auid) for auid in self._get_auids() for node, node_object in zip(self._get_nodes(), node_objects)}
         results = {}
         for future in concurrent.futures.as_completed(futures):
             k = futures[future]
             try:
-                result = future.result() # Just returns True
-                results[k] = 'Requested'
+                status, reason = future.result()
+                results[k] = 'Requested' if status == 200 else reason
             except Exception as exc:
                 if self._args.verbose:
                     traceback.print_exc()
                 results[k] = exc
         # Output
         print(tabulate.tabulate([[auid] + [results[(node, auid)] for node in self._get_nodes()] for auid in self._get_auids()],
-                                headers=[action] + self._get_nodes(),
+                                headers=['AUID'] + self._get_nodes(),
                                 tablefmt=self._args.output_format))
 
-    def _per_host(self):
+    def _per_node(self):
         self._initialize_auth()
         self._initialize_executor()
-        if self._args.command in ['crawl-plugins', 'cp']:
-            action = 'Crawl Plugins'
-        elif self._args.command in ['reload-config', 'rc']:
-            action = 'Reload Config'
-        else:
-            raise RuntimeError(f'internal error: unknown command: {self._args.command}')
-        futures = {self._executor.submit(_do_per_node, node, action, self._auth): node for node in self._get_nodes()}
+        node_objects = [lockss.debugpanel.node(node, *self._auth) for node in self._get_nodes()]
+        futures = {self._executor.submit(_do_per_node, node_object, self._args.target, pickled=True): node for node, node_object in zip(self._get_nodes(), node_objects)}
         results = {}
         for future in concurrent.futures.as_completed(futures):
             k = futures[future]
             try:
-                result = future.result() # Just returns True
-                results[k] = 'Requested'
+                status, reason = future.result()
+                results[k] = 'Requested' if status == 200 else reason
             except Exception as exc:
                 if self._args.verbose:
                     traceback.print_exc()
                 results[k] = exc
         # Output
         print(tabulate.tabulate([[node, results[node]] for node in self._get_nodes()],
-                                headers=['Node', action],
+                                headers=['Node', 'Result'],
                                 tablefmt=self._args.output_format))
 
     def _usage(self):
