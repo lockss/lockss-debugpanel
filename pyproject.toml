@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "lockss-debugpanel"
-version = "0.5.0"
-description = "Tool to interact with the LOCKSS 1.x DebugPanel servlet"
+version = "0.6.0"
+description = "Library and command line tool to interact with the LOCKSS 1.x DebugPanel servlet"
 license = "BSD-3-Clause"
 authors = [
     "Thib Guicherd-Callin <thib@cs.stanford.edu>"
