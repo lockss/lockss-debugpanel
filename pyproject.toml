@@ -8,7 +8,7 @@ authors = [
 ]
 readme = "README.rst"
 homepage = "https://www.lockss.org/"
-repository = "https://code.stanford.edu/lockss/tools/debugpanel"
+repository = "https://github.com/lockss/lockss-debugpanel"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
