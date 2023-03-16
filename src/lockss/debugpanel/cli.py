@@ -120,7 +120,7 @@ class DebugPanelCli(object):
             self._auids = list()
             self._auids.extend(self._args.auid)
             for path in self._args.auids:
-                self._nodes.extend(_file_lines(path))
+                self._auids.extend(_file_lines(path))
             if len(self._auids) == 0:
                 self._parser.error('list of AUIDs to process is empty')
         return self._auids

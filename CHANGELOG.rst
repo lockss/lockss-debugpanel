@@ -3,10 +3,30 @@ Release Notes
 =============
 
 -----
+0.6.1
+-----
+
+Released: 2023-03-16
+
+.. rubric:: Bug Fixes
+
+*  Files from ``--auids`` were appended to nodes.
+
+-----
+0.6.0
+-----
+
+Released: 2023-03-15
+
+.. rubric:: Features
+
+*  Now providing a Python library.
+
+-----
 0.5.0
 -----
 
-Released: unreleased
+Released: 2023-03-10
 
 .. rubric:: Features
 
