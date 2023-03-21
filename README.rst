@@ -12,23 +12,91 @@ Debugpanel is a library and command line tool to interact with the LOCKSS 1.x De
 
 **Latest release:** 0.7.0-dev1 (?)
 
--------------
-Prerequisites
--------------
+-----------------
+Table of Contents
+-----------------
 
-*  `Python <https://www.python.org/>`_ 3.7 or greater.
+*  `Installation`_
 
-Prerequisites for development work only:
+   *  `Prerequisites`_
 
-*  `Poetry <https://python-poetry.org/>`_ 1.4 or greater.
+   *  `pip`_
+
+*  `Overview`_
+
+   * `Per-Node Operations`_
+
+   * `Per-AU Operations`_
+
+*  `Command Line Tool`_
+
+   * `Synopsis`_
+
+   * `Commands`_
+
+      * `Top-Level Program`_
+
+      *  `check-substance`_
+
+      *  `copyright`_
+
+      *  `crawl`_
+
+      *  `crawl-plugins`_
+
+      *  `deep-crawl`_
+
+      *  `disable-indexing`_
+
+      *  `license`_
+
+      *  `poll`_
+
+      *  `reindex-metadata`_
+
+      *  `reload-config`_
+
+      *  `usage`_
+
+      *  `validate-files`_
+
+      *  `version`_
+
+   * `Options`_
+
+      *  `Node Arguments and Options`_
+
+      *  `AUID Options`_
+
+      *  `Output Format Control`_
+
+      *  `Job Pool Control`_
+
+*  `Library`_
 
 ------------
 Installation
 ------------
 
-Debugpanel is available from the `Python Package Index <https://pypi.org/>`_ (PyPI) as ``lockss-debugpanel``: https://pypi.org/project/lockss-debugpanel
+Debugpanel is available from the `Python Package Index <https://pypi.org/>`_ (PyPI) as ``lockss-debugpanel`` (https://pypi.org/project/lockss-debugpanel), and can be installed with `pip`_.
 
-You can install it with ``pip``. To install it in a virtual environment, simply use::
+The installation process adds a ``lockss.debugpanel`` Python `Library`_ and a ``debugpanel`` `Command Line Tool`_. You can check at the command line that the installation is functional by running ``debugpanel version`` or ``debugpanel --help``.
+
+Prerequisites
+=============
+
+*  `Python <https://www.python.org/>`_ 3.7 or greater. (You can check the version of Python 3 with ``python3 --version``.)
+
+Prerequisites for development work only:
+
+*  `Poetry <https://python-poetry.org/>`_ 1.4 or greater. (You can check the version of Poetry with ``poetry --version``.)
+
+.. _pip:
+
+``pip``
+=======
+
+You can install Debugpanel with ``pip``. To install it in a virtual environment, simply use::
 
    pip3 install lockss-debugpanel
 
@@ -40,8 +108,6 @@ To install it in your own non-root, non-virtual environment, use the ``--user`` 
 
    Do not run ``pip3``/``pip`` as ``root``, with ``sudo`` or otherwise.
 
-The installation process adds a ``lockss.debugpanel`` `Library`_ and a ``debugpanel`` `Command Line Tool`_. You can check at the command line that the installation is functional by running ``debugpanel version`` or ``debugpanel --help``.
-
 --------
 Overview
 --------
@@ -49,66 +115,31 @@ Overview
 Per-Node Operations
 ===================
 
-You can use Debugpanel to get LOCKSS nodes to:
+Some operations operate on one or more nodes.
 
-*  Reload their configuration (`reload-config`_ command, ``lockss.debugpanel.reload_config()`` function).
-
-*  Crawl their plugins (`crawl-plugins`_ command, ``lockss.debugpanel.crawl_plugins()`` function).
+========================= ================= =======
+Operation                 Command           Function
+========================= ================= =======
+Crawl plugins             `crawl-plugins`_  ``crawl_plugins()``
+Reload node configuration `reload-config`_  ``reload_config()``
+========================= ================= =======
 
 Per-AU Operations
 =================
 
-You can use Debugpanel to get LOCKSS nodes to perform an operation on AUs identified by AUID, namely:
+Some operation operate on one or more AUs on one or more nodes.
 
-*  Crawl (`crawl`_ command, ``lockss.debugpanel.crawl()`` function).
-
-*  Crawl with depth (`deep-crawl`_ command, ``lockss.debugpanel.deep_crawl()`` function).
-
-*  Poll (`poll`_ command, ``lockss.debugpanel.poll()`` function).
-
-*  Check substance (`check-substance`_ command, ``lockss.debugpanel.check_substance()`` function).
-
-*  Validate files (`validate-files`_ command, ``lockss.debugpanel.validate_files()`` function).
-
-*  Reindex metadata (`reindex-metadata`_ command, ``lockss.debugpanel.reindex_metadata()`` function).
-
-*  Disable metadata indexing (`disable-indexing`_ command, ``lockss.debugpanel.disable_reindexing()`` function).
-
--------
-Library
--------
-
-You can use Debugpanel as a Python library.
-
-The ``lockss.debugpanel`` module's ``node()`` method can create a node object from a node reference (a string like ``host:8081``, ``http://host:8081``, ``http://host:8081/``, ``https://host:8081``, ``https://host:8081/``; no protocol defaults to ``http://``), a username, and a password.
-
-This node object can be used as the argument to ``crawl_plugins()`` or ``reload_config()``.
-
-It can also be used as the first argument to ``check_substance()``, ``crawl()``, ``deep_crawl()``, ``disable_indexing()``, ``poll()``, ``reindex_metadata()``, or ``validate_files``, together with an AUID string as the second argument.
-
-The ``deep_crawl()`` method has an optional third argument, ``depth``, for the crawl depth (whch defaults to ``lockss.debugpanel.DEFAULT_DEPTH``).
-
-All operations return the modified ``http.client.HTTPResponse`` object from ``urllib.request.urlopen()`` (see https://docs.python.org/3.7/library/urllib.request.html#urllib.request.urlopen). A status code of 200 indicates that the request to the node was made successfully (but not much else; for example if there is no such AUID for an AUID operation, nothing happens).
-
-Use of the module is illustrated in this example::
-
-    import getpass
-    import lockss.debugpanel
-
-    hostport = '...'
-    username = input('Username: ')
-    password = getpass.getpass('Password: ')
-    node = lockss.debugpanel.node(hostport, username, password)
-    auid = '...'
-
-    try:
-        resp = lockss.debugpanel.poll(node, auid)
-        if resp.status == 200:
-            print('Poll requested (200)')
-        else:
-            print(f'{resp.reason} ({resp.status})')
-    except Exception as exc:
-        print(f'Error: {exc!s}')
+================================ ==================== =======
+Operation                        Command              Function
+================================ ==================== =======
+Check substance of AUs           `check-substance`_   ``check_substance()``
+Crawl AUs                        `crawl`_             ``crawl()``
+Crawl AUs with depth             `deep-crawl`_        ``deep_crawl()``
+Disable metadata indexing of AUs `disable-indexing`_  ``disable_indexing()``
+Poll                             `poll`_              ``poll()``
+Reindex AU metadata              `reindex-metadata`_  ``reindex_metadata()``
+Validate AU files                `validate-files`_    ``validate_files()``
+================================ ==================== =======
 
 -----------------
 Command Line Tool
@@ -123,6 +154,9 @@ or as a Python module::
    python3 -m lockss.debugpanel
 
 Help messages and this document use ``debugpanel`` throughout, but the two invocation styles are interchangeable.
+
+Synopsis
+========
 
 Debugpanel uses `Commands`_, in the style of programs like ``git``, ``dnf``/``yum``, ``apt``/``apt-get``, and the like. You can see the list of available `Commands`_ by invoking ``debugpanel --help``, and you can find a usage summary of all the `Commands`_ by invoking ``debugpanel usage``::
 
@@ -217,8 +251,8 @@ The available commands are:
 *  `validate-files`_ (vf):   cause nodes to run file validation on AUs
 *  `version`_:               show version and exit
 
-Top-Level Command
-=================
+Top-Level Program
+-----------------
 
 The top-level executable alone does not perform any action or default to a given command. It does define a few options, which you can see by invoking Debugpanel with the |HELP| option::
 
@@ -254,7 +288,7 @@ The top-level executable alone does not perform any action or default to a given
 .. _check-substance:
 
 ``check-substance`` (``cs``)
-============================
+----------------------------
 
 The ``check-substance`` command is one of the `Per-AU Operations`_, used to cause nodes to check the substance of AUs. It has its own |HELP| option::
 
@@ -312,14 +346,14 @@ It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 .. _copyright:
 
 ``copyright``
-=============
+-------------
 
 The ``copyright`` command displays the copyright notice for Debugpanel and exits.
 
 .. _crawl:
 
 ``crawl`` (``cr``)
-==================
+------------------
 
 The ``crawl`` command is one of the `Per-AU Operations`_, used to cause nodes to crawl AUs. It has its own |HELP| option::
 
@@ -370,7 +404,7 @@ It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 .. _crawl-plugins:
 
 ``crawl-plugins`` (``cp``)
-==========================
+--------------------------
 
 The ``crawl-plugins`` command is one of the `Per-Node Operations`_, used to cause nodes to crawl their plugins. It has its own |HELP| option::
 
@@ -419,7 +453,7 @@ It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 .. _deep-crawl:
 
 ``deep-crawl`` (``dc``)
-=======================
+-----------------------
 
 The ``deep-crawl`` command is one of the `Per-AU Operations`_, used to cause nodes to crawl AUs with depth. It has its own |HELP| option::
 
@@ -481,7 +515,7 @@ It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 .. _disable-indexing:
 
 ``disable-indexing`` (``di``)
-=============================
+-----------------------------
 
 The ``disable-indexing`` command is one of the `Per-AU Operations`_, used to cause nodes to disable metadata indexing of AUs. It has its own |HELP| option::
 
@@ -539,14 +573,14 @@ It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 .. _license:
 
 ``license``
-=============
+-----------
 
 The ``license`` command displays the license terms for Debugpanel and exits.
 
 .. _poll:
 
 ``poll`` (``po``)
-=================
+-----------------
 
 The ``poll`` command is one of the `Per-AU Operations`_, used to cause nodes to poll AUs. It has its own |HELP| option::
 
@@ -602,7 +636,7 @@ It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 .. _reindex-metadata:
 
 ``reindex-metadata`` (``ri``)
-=============================
+-----------------------------
 
 The ``reindex-metadata`` command is one of the `Per-AU Operations`_, used to cause nodes to reindex the metadata of AUs. It has its own |HELP| option::
 
@@ -660,7 +694,7 @@ It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 .. _reload-config:
 
 ``reload-config`` (``rc``)
-==========================
+--------------------------
 
 The ``reload-config`` command is one of the `Per-Node Operations`_, used to cause nodes to reload their configuration. It has its own |HELP| option::
 
@@ -709,14 +743,14 @@ It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 .. _usage:
 
 ``usage``
-=========
+---------
 
 The ``usage`` command displays the usage message of all the Debugpanel `Commands`_.
 
 .. _validate-files:
 
 ``validate-files`` (``vf``)
-=============================
+---------------------------
 
 The ``validate-files`` command is one of the `Per-AU Operations`_, used to cause nodes to reindex the metadata of AUs. It has its own |HELP| option::
 
@@ -773,16 +807,15 @@ It also accepts `Options`_ for `Output Format Control`_ and `Job Pool Control`_.
 .. _version:
 
 ``version``
-===========
+-----------
 
 The ``version`` command displays the version number of Debugpanel and exits.
 
--------
 Options
--------
+=======
 
 Node Arguments and Options
-==========================
+--------------------------
 
 `Commands`_ for `Per-Node Operations`_ expect one or more node references in ``HOST:PORT`` format, for instance ``lockss.myuniversity.edu:8081``. The list of nodes to process is derived from:
 
@@ -793,7 +826,7 @@ Node Arguments and Options
 *  The nodes found in the files listed as |NODES| options.
 
 AUID Options
-============
+------------
 
 In addition to `Node Arguments and Options`_, `Commands`_ for `Per-AU Operations`_ expect one or more AUIDs. The list of AUIDs to target is derived from:
 
@@ -802,11 +835,59 @@ In addition to `Node Arguments and Options`_, `Commands`_ for `Per-AU Operations
 *  The AUIDs found in the files listed as |AUIDS| options.
 
 Output Format Control
-=====================
+---------------------
 
 Debugpanel's tabular output is performed by the `tabulate <https://pypi.org/project/tabulate>`_ library through the ``--output-format`` option. See its PyPI page for a visual reference of the various output formats available. The **default** is ``simple``.
 
 Job Pool Control
-================
+----------------
 
 Debugpanel performs multiple operations (contacting multiple nodes and/or working on multiple AU requests per node) in parallel using a thread pool (``--thread-pool``, the default) or a process pool (``--process-pool``). You can change the size of the job pool with the ``--pool-size`` option, which accepts a nonzero integer. Note that the underlying implementation may limit the number of threads or processes despite a larger number at the command line. The default value depends on the system's CPU characteristics (represented in this document as "N"). Using ``--thread-pool --pool-size=1`` approximates no parallel processing.
+
+.. _check_substance():
+.. _crawl():
+.. _crawl_plugins():
+.. _deep_crawl():
+.. _disable_indexing():
+.. _node():
+.. _poll():
+.. _reindex_metadata():
+.. _reload_config():
+.. _validate_files():
+
+-------
+Library
+-------
+
+You can use Debugpanel as a Python library.
+
+The ``lockss.debugpanel`` module's `node()`_ method can create a node object from a node reference (a string like ``host:8081``, ``http://host:8081``, ``http://host:8081/``, ``https://host:8081``, ``https://host:8081/``; no protocol defaults to ``http://``), a username, and a password.
+
+This node object can be used as the argument to `crawl_plugins()`_ or `reload_config()`_.
+
+It can also be used as the first argument to `check_substance()`_, `crawl()`_, `deep_crawl()`_, `disable_indexing()`_, `poll()`_, `reindex_metadata()`_, or `validate_files()`_, together with an AUID string as the second argument.
+
+The `deep_crawl()`_ method has an optional third argument, ``depth``, for the crawl depth (whch defaults to ``lockss.debugpanel.DEFAULT_DEPTH``).
+
+All operations return the modified ``http.client.HTTPResponse`` object from ``urllib.request.urlopen()`` (see https://docs.python.org/3.7/library/urllib.request.html#urllib.request.urlopen). A status code of 200 indicates that the request to the node was made successfully (but not much else; for example if there is no such AUID for an AUID operation, nothing happens).
+
+Use of the module is illustrated in this example::
+
+    import getpass
+    import lockss.debugpanel
+
+    hostport = '...'
+    username = input('Username: ')
+    password = getpass.getpass('Password: ')
+    node = lockss.debugpanel.node(hostport, username, password)
+    auid = '...'
+
+    try:
+        resp = lockss.debugpanel.poll(node, auid)
+        if resp.status == 200:
+            print('Poll requested (200)')
+        else:
+            print(f'{resp.reason} ({resp.status})')
+    except Exception as exc:
+        print(f'Error: {exc!s}')
+
