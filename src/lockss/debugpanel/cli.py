@@ -162,6 +162,13 @@ class DebugPanelCli(object):
                                default=DebugPanelCli.DEFAULT_DEPTH,
                                help='depth of deep crawls (default: %(default)s)')
 
+    def _make_option_output_format(self, container):
+        container.add_argument('--output-format',
+                               metavar='FMT',
+                               choices=tabulate.tabulate_formats,
+                               default='simple',
+                               help='set tabular output format to %(metavar)s (default: %(default)s; choices: %(choices)s)')
+
     def _make_option_verbose(self, container):
         container.add_argument('--verbose', '-v',
                                action='store_true',
@@ -217,13 +224,6 @@ class DebugPanelCli(object):
         group.add_argument('--username', '-u',
                            metavar='USER',
                            help='UI username (default: interactive prompt)')
-
-    def _make_option_output_format(self, container):
-        container.add_argument('--output-format',
-                               metavar='FMT',
-                               choices=tabulate.tabulate_formats,
-                               default='simple',
-                               help='set tabular output format to %(metavar)s (default: %(default)s; choices: %(choices)s)')
 
     def _make_parser(self):
         self._parser = argparse.ArgumentParser(prog=DebugPanelCli.PROG)
