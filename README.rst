@@ -96,13 +96,15 @@ Prerequisites for development work only:
 ``pip``
 =======
 
-You can install Debugpanel with ``pip``. To install it in a virtual environment, simply use::
-
-   pip3 install lockss-debugpanel
+You can install Debugpanel with ``pip``.
 
 To install it in your own non-root, non-virtual environment, use the ``--user`` option::
 
    pip3 install --user lockss-debugpanel
+
+To install it in a virtual environment, simply use::
+
+   pip3 install lockss-debugpanel
 
 .. danger::
 
@@ -117,29 +119,29 @@ Per-Node Operations
 
 Some operations operate on one or more nodes.
 
-========================= ================= =======
-Operation                 Command           Function
-========================= ================= =======
-Crawl plugins             `crawl-plugins`_  ``crawl_plugins()``
-Reload node configuration `reload-config`_  ``reload_config()``
-========================= ================= =======
+========================= ================ ========
+Operation                 Command          Function
+========================= ================ ========
+Crawl plugins             `crawl-plugins`_ ``crawl_plugins()``
+Reload node configuration `reload-config`_ ``reload_config()``
+========================= ================ ========
 
 Per-AU Operations
 =================
 
 Some operation operate on one or more AUs on one or more nodes.
 
-================================ ==================== =======
-Operation                        Command              Function
-================================ ==================== =======
-Check substance of AUs           `check-substance`_   ``check_substance()``
-Crawl AUs                        `crawl`_             ``crawl()``
-Crawl AUs with depth             `deep-crawl`_        ``deep_crawl()``
-Disable metadata indexing of AUs `disable-indexing`_  ``disable_indexing()``
-Poll                             `poll`_              ``poll()``
-Reindex AU metadata              `reindex-metadata`_  ``reindex_metadata()``
-Validate AU files                `validate-files`_    ``validate_files()``
-================================ ==================== =======
+================================ =================== ========
+Operation                        Command             Function
+================================ =================== ========
+Check substance of AUs           `check-substance`_  ``check_substance()``
+Crawl AUs                        `crawl`_            ``crawl()``
+Crawl AUs with depth             `deep-crawl`_       ``deep_crawl()``
+Disable metadata indexing of AUs `disable-indexing`_ ``disable_indexing()``
+Poll                             `poll`_             ``poll()``
+Reindex AU metadata              `reindex-metadata`_ ``reindex_metadata()``
+Validate AU files                `validate-files`_   ``validate_files()``
+================================ =================== ========
 
 -----------------
 Command Line Tool
@@ -237,19 +239,23 @@ Commands
 
 The available commands are:
 
-*  `check-substance`_ (cs):  cause nodes to check the substance of AUs
-*  `copyright`_:             show copyright and exit
-*  `crawl`_ (cr):            cause nodes to crawl AUs
-*  `crawl-plugins`_ (cp):    cause nodes to crawl plugins
-*  `deep-crawl`_ (dc):       cause nodes to crawl AUs, with depth
-*  `disable-indexing`_ (di): cause nodes to disable metadata indexing of AUs
-*  `license`_:               show license and exit
-*  `poll`_ (po):             cause nodes to poll AUs
-*  `reindex-metadata`_ (ri): cause nodes to reindex the metadata of AUs
-*  `reload-config`_ (rc):    cause nodes to reload their configuration
-*  `usage`_:                 show detailed usage and exit
-*  `validate-files`_ (vf):   cause nodes to run file validation on AUs
-*  `version`_:               show version and exit
+=================== ============ =======
+Command             Abbreviation Purpose
+=================== ============ =======
+`check-substance`_  cs           cause nodes to check the substance of AUs
+`copyright`_                     show copyright and exit
+`crawl`_            cr           cause nodes to crawl AUs
+`crawl-plugins`_    cp           cause nodes to crawl plugins
+`deep-crawl`_       dc           cause nodes to crawl AUs, with depth
+`disable-indexing`_ di           cause nodes to disable metadata indexing of AUs
+`license`_                       show license and exit
+`poll`_             po           cause nodes to poll AUs
+`reindex-metadata`_ ri           cause nodes to reindex the metadata of AUs
+`reload-config`_    rc           cause nodes to reload their configuration
+`usage`_                         show detailed usage and exit
+`validate-files`_   vf           cause nodes to run file validation on AUs
+`version`_                       show version and exit
+=================== ============ =======
 
 Top-Level Program
 -----------------
