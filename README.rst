@@ -270,7 +270,7 @@ The top-level executable alone does not perform any action or default to a given
       --verbose, -v         print verbose output
 
     commands:
-      Add --help to see the command's own help message
+      Add --help to see the command's own help message.
 
       COMMAND               DESCRIPTION
         check-substance (cs)
@@ -306,7 +306,7 @@ The ``check-substance`` command is one of the `Per-AU Operations`_, used to caus
                                       [--process-pool | --thread-pool]
                                       [HOST:PORT ...]
 
-    Cause nodes to check the substance of AUs
+    Cause nodes to check the substance of AUs.
 
     options:
       -h, --help            show this help message and exit
@@ -369,7 +369,7 @@ The ``crawl`` command is one of the `Per-AU Operations`_, used to cause nodes to
                                     [--process-pool | --thread-pool]
                                     [HOST:PORT ...]
 
-    Cause nodes to crawl plugins
+    Cause nodes to crawl plugins.
 
     options:
       -h, --help            show this help message and exit
@@ -420,7 +420,7 @@ The ``crawl-plugins`` command is one of the `Per-Node Operations`_, used to caus
                                     [--process-pool | --thread-pool]
                                     [HOST:PORT ...]
 
-    Cause nodes to crawl plugins
+    Cause nodes to crawl plugins.
 
     options:
       -h, --help            show this help message and exit
@@ -470,7 +470,7 @@ The ``deep-crawl`` command is one of the `Per-AU Operations`_, used to cause nod
                                  [--process-pool | --thread-pool] [--depth DEPTH]
                                  [HOST:PORT ...]
 
-    Cause nodes to crawl AUs, with depth
+    Cause nodes to crawl AUs, with depth.
 
     options:
       -h, --help            show this help message and exit
@@ -533,7 +533,7 @@ The ``disable-indexing`` command is one of the `Per-AU Operations`_, used to cau
                                        [--process-pool | --thread-pool]
                                        [HOST:PORT ...]
 
-    Cause nodes to disable metadata indexing of AUs
+    Cause nodes to disable metadata indexing of AUs.
 
     options:
       -h, --help            show this help message and exit
@@ -596,7 +596,7 @@ The ``poll`` command is one of the `Per-AU Operations`_, used to cause nodes to 
                            [--process-pool | --thread-pool]
                            [HOST:PORT ...]
 
-    Cause nodes to poll AUs
+    Cause nodes to poll AUs.
 
     options:
       -h, --help            show this help message and exit
@@ -654,7 +654,7 @@ The ``reindex-metadata`` command is one of the `Per-AU Operations`_, used to cau
                                        [--process-pool | --thread-pool]
                                        [HOST:PORT ...]
 
-    Cause nodes to reindex the metadata of AUs
+    Cause nodes to reindex the metadata of AUs.
 
     options:
       -h, --help            show this help message and exit
@@ -710,7 +710,7 @@ The ``reload-config`` command is one of the `Per-Node Operations`_, used to caus
                                     [--process-pool | --thread-pool]
                                     [HOST:PORT ...]
 
-    Cause nodes to reload their configuration
+    Cause nodes to reload their configuration.
 
     options:
       -h, --help            show this help message and exit
@@ -767,7 +767,7 @@ The ``validate-files`` command is one of the `Per-AU Operations`_, used to cause
                                      [--process-pool | --thread-pool]
                                      [HOST:PORT ...]
 
-    Cause nodes to run file validation on AUs
+    Cause nodes to run file validation on AUs.
 
     options:
       -h, --help            show this help message and exit

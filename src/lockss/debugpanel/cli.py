@@ -228,7 +228,7 @@ class DebugPanelCli(object):
     def _make_parser(self):
         self._parser = argparse.ArgumentParser(prog=DebugPanelCli.PROG)
         self._subparsers = self._parser.add_subparsers(title='commands',
-                                                       description="Add --help to see the command's own help message",
+                                                       description="Add --help to see the command's own help message.",
                                                        dest='command',
                                                        required=True,
                                                        # With subparsers, metavar is also used as the heading of the column of subcommands
@@ -254,34 +254,34 @@ class DebugPanelCli(object):
     def _make_parser_check_substance(self, container):
         self._make_parser_per_auid(container,
                                    'check-substance', ['cs'],
-                                   'Cause nodes to check the substance of AUs',
+                                   'Cause nodes to check the substance of AUs.',
                                    'cause nodes to check the substance of AUs',
                                    lockss.debugpanel.check_substance)
 
     def _make_parser_copyright(self, container):
         parser = container.add_parser('copyright',
-                                      description='Show copyright and exit',
+                                      description='Show copyright and exit.',
                                       help='show copyright and exit')
         parser.set_defaults(fun=self._copyright)
 
     def _make_parser_crawl(self, container):
         self._make_parser_per_auid(container,
                                    'crawl', ['cr'],
-                                   'Cause nodes to crawl AUs',
+                                   'Cause nodes to crawl AUs.',
                                    'cause nodes to crawl AUs',
                                    lockss.debugpanel.crawl)
 
     def _make_parser_crawl_plugins(self, container):
         self._make_parser_per_node(container,
                                    'crawl-plugins', ['cp'],
-                                   'Cause nodes to crawl plugins',
+                                   'Cause nodes to crawl plugins.',
                                    'cause nodes to crawl plugins',
                                    lockss.debugpanel.crawl_plugins)
 
     def _make_parser_deep_crawl(self, container):
         parser = self._make_parser_per_auid(container,
                                             'deep-crawl', ['dc'],
-                                            'Cause nodes to crawl AUs, with depth',
+                                            'Cause nodes to crawl AUs, with depth.',
                                             'cause nodes to crawl AUs, with depth',
                                             lockss.debugpanel.deep_crawl)
         self._make_option_depth(parser)
@@ -289,13 +289,13 @@ class DebugPanelCli(object):
     def _make_parser_disable_indexing(self, container):
         parser = self._make_parser_per_auid(container,
                                             'disable-indexing', ['di'],
-                                            'Cause nodes to disable metadata indexing of AUs',
+                                            'Cause nodes to disable metadata indexing of AUs.',
                                             'cause nodes to disable metadata indexing of AUs',
                                             lockss.debugpanel.disable_indexing)
 
     def _make_parser_license(self, container):
         parser = container.add_parser('license',
-                                      description='Show license and exit',
+                                      description='Show license and exit.',
                                       help='show license and exit')
         parser.set_defaults(fun=self._license)
 
@@ -324,40 +324,40 @@ class DebugPanelCli(object):
     def _make_parser_poll(self, container):
         self._make_parser_per_auid(container,
                                    'poll', ['po'],
-                                   'Cause nodes to poll AUs',
+                                   'Cause nodes to poll AUs.',
                                    'cause nodes to poll AUs',
                                    lockss.debugpanel.poll)
 
     def _make_parser_reindex_metadata(self, container):
         parser = self._make_parser_per_auid(container,
                                             'reindex-metadata', ['ri'],
-                                            'Cause nodes to reindex the metadata of AUs',
+                                            'Cause nodes to reindex the metadata of AUs.',
                                             'cause nodes to reindex the metadata of AUs',
                                             lockss.debugpanel.reindex_metadata)
 
     def _make_parser_reload_config(self, container):
         self._make_parser_per_node(container,
                                    'reload-config', ['rc'],
-                                   'Cause nodes to reload their configuration',
+                                   'Cause nodes to reload their configuration.',
                                    'cause nodes to reload their configuration',
                                    lockss.debugpanel.reload_config)
 
     def _make_parser_usage(self, container):
         parser = container.add_parser('usage',
-                                      description='Show detailed usage and exit',
+                                      description='Show detailed usage and exit.',
                                       help='show detailed usage and exit')
         parser.set_defaults(fun=self._usage)
 
     def _make_parser_validate_files(self, container):
         self._make_parser_per_auid(container,
                                    'validate-files', ['vf'],
-                                   'Cause nodes to run file validation on AUs',
+                                   'Cause nodes to run file validation on AUs.',
                                    'cause nodes to run file validation on AUs',
                                    lockss.debugpanel.validate_files)
 
     def _make_parser_version(self, container):
         parser = container.add_parser('version',
-                                      description='Show version and exit',
+                                      description='Show version and exit.',
                                       help='show version and exit')
         parser.set_defaults(fun=self._version)
 
