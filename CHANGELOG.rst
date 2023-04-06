@@ -3,6 +3,16 @@ Release Notes
 =============
 
 -----
+0.7.0
+-----
+
+Released: unreleased
+
+*  **Features**
+
+   *  CLI improvements.
+
+-----
 0.6.1
 -----
 

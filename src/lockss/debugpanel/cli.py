@@ -38,6 +38,7 @@ import traceback
 import urllib.error
 import urllib.request
 
+import rich_argparse
 import tabulate
 
 import lockss.debugpanel
@@ -226,7 +227,15 @@ class DebugPanelCli(object):
                            help='UI username (default: interactive prompt)')
 
     def _make_parser(self):
-        self._parser = argparse.ArgumentParser(prog=DebugPanelCli.PROG)
+        for cls in [rich_argparse.RichHelpFormatter]:
+            cls.styles.update({
+                'argparse.args': f'bold {cls.styles["argparse.args"]}',
+                'argparse.groups': f'bold {cls.styles["argparse.groups"]}',
+                'argparse.metavar': f'bold {cls.styles["argparse.metavar"]}',
+                'argparse.prog': f'bold {cls.styles["argparse.prog"]}',
+            })
+        self._parser = argparse.ArgumentParser(prog=DebugPanelCli.PROG,
+                                               formatter_class=rich_argparse.RichHelpFormatter)
         self._subparsers = self._parser.add_subparsers(title='commands',
                                                        description="Add --help to see the command's own help message.",
                                                        dest='command',
@@ -261,7 +270,8 @@ class DebugPanelCli(object):
     def _make_parser_copyright(self, container):
         parser = container.add_parser('copyright',
                                       description='Show copyright and exit.',
-                                      help='show copyright and exit')
+                                      help='show copyright and exit',
+                                      formatter_class=self._parser.formatter_class)
         parser.set_defaults(fun=self._copyright)
 
     def _make_parser_crawl(self, container):
@@ -296,13 +306,15 @@ class DebugPanelCli(object):
     def _make_parser_license(self, container):
         parser = container.add_parser('license',
                                       description='Show license and exit.',
-                                      help='show license and exit')
+                                      help='show license and exit',
+                                      formatter_class=self._parser.formatter_class)
         parser.set_defaults(fun=self._license)
 
     def _make_parser_per_auid(self, container, option, aliases, description, help, target):
         parser = container.add_parser(option, aliases=aliases,
                                       description=description,
-                                      help=help)
+                                      help=help,
+                                      formatter_class=self._parser.formatter_class)
         parser.set_defaults(fun=self._per_auid)
         parser.set_defaults(target=target)
         self._make_option_output_format(parser)
@@ -314,7 +326,8 @@ class DebugPanelCli(object):
     def _make_parser_per_node(self, container, option, aliases, description, help, target):
         parser = container.add_parser(option, aliases=aliases,
                                       description=description,
-                                      help=help)
+                                      help=help,
+                                      formatter_class=self._parser.formatter_class)
         parser.set_defaults(fun=self._per_node)
         parser.set_defaults(target=target)
         self._make_option_output_format(parser)
@@ -345,7 +358,8 @@ class DebugPanelCli(object):
     def _make_parser_usage(self, container):
         parser = container.add_parser('usage',
                                       description='Show detailed usage and exit.',
-                                      help='show detailed usage and exit')
+                                      help='show detailed usage and exit',
+                                      formatter_class=self._parser.formatter_class)
         parser.set_defaults(fun=self._usage)
 
     def _make_parser_validate_files(self, container):
@@ -358,7 +372,8 @@ class DebugPanelCli(object):
     def _make_parser_version(self, container):
         parser = container.add_parser('version',
                                       description='Show version and exit.',
-                                      help='show version and exit')
+                                      help='show version and exit',
+                                      formatter_class=self._parser.formatter_class)
         parser.set_defaults(fun=self._version)
 
     def _per_auid(self):
