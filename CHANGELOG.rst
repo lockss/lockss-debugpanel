@@ -6,7 +6,7 @@ Release Notes
 0.7.0
 -----
 
-Released: unreleased
+Released: 2023-05-02
 
 *  **Features**
 
