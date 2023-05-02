@@ -3,10 +3,20 @@ Release Notes
 =============
 
 -----
+0.8.0
+-----
+
+Released: ?
+
+*  **Features**
+
+   *  ?
+
+-----
 0.7.0
 -----
 
-Released: unreleased
+Released: 2023-05-02
 
 *  **Features**
 

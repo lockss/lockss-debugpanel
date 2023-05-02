@@ -2,7 +2,7 @@
 Debugpanel
 ==========
 
-.. |RELEASE| replace:: 0.7.0-dev1
+.. |RELEASE| replace:: 0.8.0-dev1
 .. |RELEASE_DATE| replace:: ?
 
 .. |AUID| replace:: ``--auid/-a``
