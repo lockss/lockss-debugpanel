@@ -2,7 +2,7 @@
 Debugpanel
 ==========
 
-.. |RELEASE| replace:: 0.7.0
+.. |RELEASE| replace:: 0.7.0-post1
 .. |RELEASE_DATE| replace:: 2023-05-02
 
 .. |AUID| replace:: ``--auid/-a``
@@ -10,6 +10,10 @@ Debugpanel
 .. |HELP| replace:: ``--help/-h``
 .. |NODE| replace:: ``--node/-n``
 .. |NODES| replace:: ``--nodes/-N``
+
+.. image:: https://assets.lockss.org/images/logos/debugpanel/debugpanel_128x128.png
+   :alt: Debugpanel logo
+   :align: right
 
 Debugpanel is a library and command line tool to interact with the LOCKSS 1.x DebugPanel servlet.
 
