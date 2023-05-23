@@ -2,7 +2,7 @@
 Debugpanel
 ==========
 
-.. |RELEASE| replace:: 0.7.0
+.. |RELEASE| replace:: 0.7.0-post1
 .. |RELEASE_DATE| replace:: 2023-05-02
 
 .. |AUID| replace:: ``--auid/-a``
