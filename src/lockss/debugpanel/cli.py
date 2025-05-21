@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright (c) 2000-2023, Board of Trustees of Leland Stanford Jr. University
+# Copyright (c) 2000-2025, Board of Trustees of Leland Stanford Jr. University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -29,35 +29,28 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
+from collections.abc import Callable
 import concurrent.futures
-import getpass
+from getpass import getpass
 import os
 from pathlib import Path, PurePath
 import sys
 import traceback
+from typing import Any, List, Literal, Optional
 import urllib.error
 import urllib.request
 
-import rich_argparse
-import tabulate
+from pydantic.v1 import BaseModel, Field, FilePath, root_validator, validator
+from pydantic.v1.types import PositiveInt
+from pydantic_argparse import ArgumentParser
+#import rich_argparse
+#import tabulate
 
-import lockss.debugpanel
-
-
-def _path(purepath_or_string):
-    if not issubclass(type(purepath_or_string), PurePath):
-        purepath_or_string = Path(purepath_or_string)
-    return purepath_or_string.expanduser().resolve()
-
-
-def _file_lines(path):
-    f = None
-    try:
-        f = open(_path(path), 'r') if path != '-' else sys.stdin
-        return [line for line in [line.partition('#')[0].strip() for line in f] if len(line) > 0]
-    finally:
-        if f is not None and path != '-':
-            f.close()
+#from lockss.pybasic.cliutil import CopyrightCommand, LicenseCommand, VersionCommand, at_most_one
+from .cliutil import BaseCli, Command, CopyrightCommand, LicenseCommand, StringCommand, VersionCommand, at_most_one
+from lockss.pybasic.fileutil import file_lines, path
+from lockss.debugpanel import __copyright__, __license__, __version__
+from .app import DebugPanelApp, JobPool
 
 
 def _do_per_auid(node_object, auid, target, **kwargs):
@@ -85,6 +78,148 @@ def _do_per_node(node_object, target, **kwargs):
         ret = target(node_object)
         return (ret.status, ret)
 
+
+class JobPoolModel(BaseModel):
+    pool_size: Optional[PositiveInt] = Field(description='[job pool] set the job pool size')
+    process_pool: Optional[bool] = Field(False, description='[job pool] use a process pool')
+    thread_pool: Optional[bool] = Field(False, description='[job pool] use a thread pool')
+
+    @root_validator
+    def at_most_one_pool_type(cls, values):
+        return at_most_one(values, 'process_pool', 'thread_pool')
+
+    def get_pool_type(self) -> JobPool:
+        field_names = JobPoolModel.__fields__.keys()
+        for field_name in field_names:
+            field_value = getattr(self, field_name)
+            if issubclass(type(field_value), bool) and field_value:
+                return JobPool.from_member(field_name)
+        return DebugPanelApp.DEFAULT_POOL_TYPE
+
+
+class NodesModel(JobPoolModel):
+    node: Optional[List[str]] = Field([], aliases=['-n'], description='[nodes] add one or more nodes to the list of nodes to process')
+    nodes: Optional[List[FilePath]] = Field([], aliases=['-N'], description='[nodes] add the nodes in one or more files to the list of nodes to process')
+    password: Optional[str] = Field(aliases=['-p'], description='[nodes] UI password; default behavior: interactive prompt')
+    username: Optional[str] = Field(aliases=['-u'], description='[nodes] UI username; default behavior: interactive prompt')
+
+    @validator('nodes', each_item=True, pre=True)
+    def _expand_each_nodes_path(cls, v: Path):
+        return path(v)
+
+    def get_nodes(self):
+        ret = self.node[:]
+        for file_path in self.nodes:
+            ret.extend(file_lines(file_path))
+        return ret
+
+class AuidsModel(NodesModel):
+    auid: Optional[List[str]] = Field([], aliases=['-a'], description='[AUIDs] add one or more AUIDs to the list of AUIDs to process')
+    auids: Optional[List[FilePath]] = Field([], aliases=['-A'], description='[AUIDs] add the AUIDs in one or more files to the list of AUIDs to process')
+
+    @validator('auids', each_item=True, pre=True)
+    def _expand_each_auids_path(cls, v: Path):
+        return path(v)
+
+    def get_auids(self):
+        ret = self.auid[:]
+        for file_path in self.auids:
+            ret.extend(file_lines(file_path))
+        return ret
+
+
+class CrawlPluginsModel(NodesModel):
+    pass
+
+
+class ReloadConfigModel(NodesModel):
+    pass
+
+
+class DebugPanelModel(BaseModel):
+    debug_cli: Optional[bool] = Field(False, description='print the result of parsing command line arguments')
+    # verbose: bool = Field(description='print the result of parsing command line arguments')
+    copyright: Optional[CopyrightCommand.type(__copyright__)] = CopyrightCommand.field()
+    cp: Optional[CrawlPluginsModel] = Field(description='synonym for: crawl-plugins')
+    crawl_plugins: Optional[CrawlPluginsModel] = Field(description='cause nodes to crawl plugins', alias='crawl-plugins')
+    license: Optional[LicenseCommand.type(__license__)] = LicenseCommand.field()
+    rc: Optional[ReloadConfigModel] = Field(description='synonym for: reload-config')
+    reload_config: Optional[ReloadConfigModel] = Field(description='cause nodes to reload their configuration', alias='reload-config')
+    version: Optional[VersionCommand.type(__version__)] = VersionCommand.field()
+
+
+class DebugPanelCli(DebugPanelApp, BaseCli[DebugPanelModel]):
+
+    def __init__(self):
+        DebugPanelApp.__init__(self)
+        BaseCli.__init__(self,
+                         model=DebugPanelModel,
+                         prog='debugpanel',
+                         description='Tool to interact with the LOCKSS 1.x DebugPanel servlet')
+
+    def _cp(self, crawl_plugins_model: CrawlPluginsModel) -> None:
+        self._crawl_plugins(crawl_plugins_model)
+
+    def _crawl_plugins(self, crawl_plugins_model: CrawlPluginsModel) -> None:
+        self._do_nodes_command(crawl_plugins_model, self.crawl_plugins)
+
+    def _copyright(self, copyright_model: StringCommand) -> None:
+        self._do_string_command(copyright_model)
+
+    def _license(self, license_model: StringCommand) -> None:
+        self._do_string_command(license_model)
+
+    def _version(self, version_model: StringCommand) -> None:
+        self._do_string_command(version_model)
+
+    # def run(self):
+    #     parser : ArgumentParser = ArgumentParser(model=DebugPanelModel,
+    #                                              prog='debugpanel',
+    #                                              description='Tool to interact with the LOCKSS 1.x DebugPanel servlet')
+    #     self.args = parser.parse_typed_args()
+    #     print(DebugPanelModel.__fields__.keys())
+    #     if self.args.debug_cli:
+    #         print(self.args)
+    #     if self.args.copyright:
+    #         self.args.copyright.print()
+    #     if self.args.license:
+    #         self.args.license.print()
+    #     if self.args.version:
+    #         self.args.version.print()
+    #     self._initialize_auth()
+    #     if (crawl_plugins := self.args.cp or self.args.crawl_plugins):
+    #         self.add_nodes(crawl_plugins.get_nodes())
+    #         self.crawl_plugins()
+    #     elif (reload_config := self.args.rc or self.args.reload_config):
+    #         self.add_nodes(reload_config.get_nodes())
+    #         self.reload_config()
+
+    def _do_auids_command(self, auids_model: AuidsModel, func: Callable) -> None:
+        self.add_auids(*auids_model.get_auids())
+        self._do_nodes_command(auids_model, func)
+
+    def _do_nodes_command(self, nodes_model: NodesModel, func: Callable) -> None:
+        self.add_nodes(*nodes_model.get_nodes())
+        self._initialize_auth(nodes_model)
+        self.set_pool_type(nodes_model.get_pool_type()) #FIXME
+        func()
+
+    def _do_string_command(self, string_command: StringCommand) -> None:
+        string_command.action()
+
+    def _initialize_auth(self, nodes_model):
+        _u = nodes_model.username or input('UI username: ')
+        _p = nodes_model.password or getpass('UI password: ')
+        self._auth = (_u, _p)
+
+
+def main():
+    DebugPanelCli().run()
+
+
+################### FIXME ####################
+
+'''
 
 class DebugPanelCli(object):
 
@@ -120,7 +255,7 @@ class DebugPanelCli(object):
         if self._auids is None:
             self._auids = list()
             self._auids.extend(self._args.auid)
-            for path in self._args.auids:
+            for path in self._args._auids:
                 self._auids.extend(_file_lines(path))
             if len(self._auids) == 0:
                 self._parser.error('list of AUIDs to process is empty')
@@ -430,6 +565,4 @@ class DebugPanelCli(object):
     def _version(self):
         print(lockss.debugpanel.__version__)
 
-
-def main():
-    DebugPanelCli().run()
+'''
