@@ -31,56 +31,94 @@
 from concurrent.futures import as_completed, Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from enum import Enum
 from tabulate import tabulate
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.request import Request, urlopen
 
 from lockss.pybasic.errorutil import InternalError
 
-import lockss.debugpanel
+from . import *
 
 
 class JobPool(Enum):
-    THREAD_POOL = 'thread-pool'
-    PROCESS_POOL = 'process-pool'
-
-    @staticmethod
-    def from_member(name: str):
-        return JobPool[name.lower()]
+    thread_pool = 'thread-pool'
+    process_pool = 'process-pool'
 
     @staticmethod
     def from_option(name: str):
         return JobPool(str.replace('-', '_'))
 
 
-def _crawl_plugins(node_object):
-    return _node_action(node_object, 'Crawl Plugins')
-
-
-def _make_request(node_object, query, **kwargs):
-    for key, val in kwargs.items():
-        query = f'{query}&{key}={val}'
-    url = f'{node_object.get_url()}/DebugPanel?{query}'
-    req = Request(url)
-    node_object.authenticate(req)
-    return req
-
-
-def _node_action(node_object, action, **kwargs):
-    action_encoded = action.replace(' ', '%20')
-    req = _make_request(node_object, f'action={action_encoded}', **kwargs)
-    try:
-        ret = urlopen(req)
-        return ret.status, ret.reason
-    except Exception as exc:
-        raise Exception(str(exc)).with_traceback(exc.__traceback__)
-
-
-def _reload_config(node_object):
-    return _node_action(node_object, 'Reload Config')
+# _DEFAULT_DEPTH = 123
+#
+# def _auid_action(node_object, auid, action, **kwargs):
+#     action_encoded = action.replace(' ', '%20')
+#     auid_encoded = auid.replace('%', '%25').replace('|', '%7C').replace('&', '%26').replace('~', '%7E')
+#     req = _make_request(node_object, f'action={action_encoded}&auid={auid_encoded}', **kwargs)
+#     try:
+#         ret = urlopen(req)
+#         return ret.status, ret.reason
+#     except Exception as exc:
+#         raise Exception(str(exc)).with_traceback(exc.__traceback__)
+#
+#
+# def _check_substance(node_object, auid):
+#     return _auid_action(node_object, auid, 'Check Substance')
+#
+#
+# def _crawl(node_object, auid):
+#     return _auid_action(node_object, auid, 'Force Start Crawl')
+#
+#
+# def _crawl_plugins(node_object):
+#     return _node_action(node_object, 'Crawl Plugins')
+#
+#
+# def _deep_crawl(node_object, auid, depth=_DEFAULT_DEPTH):
+#     return _auid_action(node_object, auid, 'Force Deep Crawl', depth=depth)
+#
+#
+# def _disable_indexing(node_object, auid):
+#     return _auid_action(node_object, auid, 'Disable Indexing')
+#
+#
+# def _make_request(node_object, query, **kwargs):
+#     for key, val in kwargs.items():
+#         query = f'{query}&{key}={val}'
+#     url = f'{node_object.get_url()}/DebugPanel?{query}'
+#     req = Request(url)
+#     node_object.authenticate(req)
+#     return req
+#
+#
+# def _node_action(node_object, action, **kwargs):
+#     action_encoded = action.replace(' ', '%20')
+#     req = _make_request(node_object, f'action={action_encoded}', **kwargs)
+#     try:
+#         ret = urlopen(req)
+#         return ret.status, ret.reason
+#     except Exception as exc:
+#         raise Exception(str(exc)).with_traceback(exc.__traceback__)
+#
+#
+# def _poll(node_object, auid):
+#     return _auid_action(node_object, auid, 'Start V3 Poll')
+#
+#
+# def _reindex_metadata(node_object, auid):
+#     return _auid_action(node_object, auid, 'Force Reindex Metadata')
+#
+#
+# def _reload_config(node_object):
+#     return _node_action(node_object, 'Reload Config')
+#
+#
+# def _validate_files(node_object, auid):
+#     return _auid_action(node_object, auid, 'Validate Files')
 
 
 class DebugPanelApp(object):
 
+    DEFAULT_DEPTH: int = _DEFAULT_DEPTH
     DEFAULT_POOL_TYPE: JobPool = JobPool.THREAD_POOL
     DEFAULT_POOL_SIZE: Optional[int] = None
 
@@ -101,6 +139,30 @@ class DebugPanelApp(object):
         self._nodes.extend(nodes)
         return self
 
+    def check_substance(self):
+        self._per_auid(_check_substance)
+
+    def crawl(self):
+        self._per_auid(_crawl)
+
+    def crawl_plugins(self):
+        self._per_node(_crawl_plugins)
+
+    def deep_crawl(self, depth=DEFAULT_DEPTH):
+        self._per_auid(_deep_crawl, depth=depth)
+
+    def disable_indexing(self):
+        self._per_auid(_disable_indexing)
+
+    def poll(self):
+        self._per_auid(_poll)
+
+    def reindex_metadata(self):
+        self._per_auid(_reindex_metadata)
+
+    def reload_config(self):
+        self._per_node(_reload_config())
+
     def set_pool_size(self, pool_size: Optional[int]):
         if pool_size and pool_size <= 0:
             raise ValueError(f'pool size: expected positive value or None, got {pool_size}')
@@ -111,11 +173,8 @@ class DebugPanelApp(object):
         self._pool_type = job_pool
         return self
 
-    def crawl_plugins(self):
-        self._per_node(_crawl_plugins)
-
-    def reload_config(self):
-        pass
+    def validate_files(self):
+        self._per_auid(_validate_files)
 
     def _initialize_executor(self):
         if self._pool_type == JobPool.THREAD_POOL:
@@ -125,6 +184,21 @@ class DebugPanelApp(object):
         else:
             raise InternalError()
 
+    def _per_auid(self, per_auid_func, **kwargs):
+        self._initialize_executor()
+        node_objects = [lockss.debugpanel.node(node, *self._auth) for node in self._nodes]
+        futures = {self._executor.submit(per_auid_func, node_object, auid, **kwargs): (node, auid) for auid in self._auids for node, node_object in zip(self._nodes, node_objects)}
+        results: Dict[Tuple[str, str], Any] = {}
+        for future in as_completed(futures):
+            node_auid = futures[future]
+            try:
+                status, reason = future.result()
+                results[node_auid] = 'Requested' if status == 200 else reason
+            except Exception as exc:
+                results[node_auid] = exc
+        print(tabulate([[auid, *[results[(node, auid)] for node in self._nodes]] for auid in self._auids],
+                       headers=['AUID', *self._nodes]))
+
     def _per_node(self, per_node_func):
         self._initialize_executor()
         node_objects = [lockss.debugpanel.node(node, *self._auth) for node in self._nodes]
@@ -133,13 +207,9 @@ class DebugPanelApp(object):
         for future in as_completed(futures):
             node = futures[future]
             try:
-                res = future.result()
-                status, reason = res
+                status, reason = future.result()
                 results[node] = 'Requested' if status == 200 else reason
             except Exception as exc:
-                #if self._args.verbose:
-                #    traceback.print_exc()
                 results[node] = exc
-        # Output
         print(tabulate([[node, results[node]] for node in self._nodes],
                        headers=['Node', 'Result']))
