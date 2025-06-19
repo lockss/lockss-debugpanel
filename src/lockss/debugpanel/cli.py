@@ -29,29 +29,41 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from collections.abc import Callable
+from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from enum import Enum
 from getpass import getpass
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic.v1 import BaseModel, Field, FilePath, root_validator, validator
 from pydantic.v1.types import PositiveInt
-import tabulate
-
+from tabulate import tabulate
 
 from lockss.pybasic.cliutil import BaseCli, StringCommand, at_most_one_from_enum, get_from_enum, COPYRIGHT_DESCRIPTION, LICENSE_DESCRIPTION, VERSION_DESCRIPTION
+from lockss.pybasic.errorutil import InternalError
 from lockss.pybasic.fileutil import file_lines, path
-from lockss.debugpanel import __copyright__, __license__, __version__
-from .app import DebugPanelApp, JobPool
+from lockss.pybasic.outpututil import OutputFormatOptions
+from . import Node, check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reload_config, reindex_metadata, validate_files, DEFAULT_DEPTH, __copyright__, __license__, __version__
 
 
-_DEFAULT_OUTPUT_FORMAT = 'simple'
+class JobPool(Enum):
+    thread_pool = 'thread-pool'
+    process_pool = 'process-pool'
+
+    @staticmethod
+    def from_option(name: str):
+        return JobPool(name.replace('-', '_'))
+
+
+DEFAULT_POOL_SIZE: Optional[int] = None
+DEFAULT_POOL_TYPE: JobPool = JobPool.thread_pool
 
 
 class NodesOptions(BaseModel):
-    node: Optional[List[str]] = Field([], aliases=['-n'], description='[nodes] add one or more nodes to the list of nodes to process')
-    nodes: Optional[List[FilePath]] = Field([], aliases=['-N'], description='[nodes] add the nodes in one or more files to the list of nodes to process')
-    password: Optional[str] = Field(aliases=['-p'], description='[nodes] UI password; interactive prompt if unspecified')
-    username: Optional[str] = Field(aliases=['-u'], description='[nodes] UI username; interactive prompt if unspecified')
+    node: Optional[List[str]] = Field([], aliases=['-n'], description='[nodes] add one or more nodes to the set of nodes to process')
+    nodes: Optional[List[FilePath]] = Field([], aliases=['-N'], description='[nodes] add the nodes listed in one or more files to the set of nodes to process')
+    password: Optional[str] = Field(aliases=['-p'], description='[nodes] UI password; interactive prompt if not specified')
+    username: Optional[str] = Field(aliases=['-u'], description='[nodes] UI username; interactive prompt if not unspecified')
 
     @validator('nodes', each_item=True, pre=True)
     def _expand_each_nodes_path(cls, v: Path):
@@ -65,8 +77,8 @@ class NodesOptions(BaseModel):
 
 
 class AuidsOptions(BaseModel):
-    auid: Optional[List[str]] = Field([], aliases=['-a'], description='[AUIDs] add one or more AUIDs to the list of AUIDs to process')
-    auids: Optional[List[FilePath]] = Field([], aliases=['-A'], description='[AUIDs] add the AUIDs in one or more files to the list of AUIDs to process')
+    auid: Optional[List[str]] = Field([], aliases=['-a'], description='[AUIDs] add one or more AUIDs to the set of AUIDs to process')
+    auids: Optional[List[FilePath]] = Field([], aliases=['-A'], description='[AUIDs] add the AUIDs listed in one or more files to the set of AUIDs to process')
 
     @validator('auids', each_item=True, pre=True)
     def _expand_each_auids_path(cls, v: Path):
@@ -80,7 +92,7 @@ class AuidsOptions(BaseModel):
 
 
 class DepthOptions(BaseModel):
-    depth: Optional[int] = Field(DebugPanelApp.DEFAULT_DEPTH, aliases=['-d'], description='[deep crawl] set crawl depth')
+    depth: Optional[int] = Field(DEFAULT_DEPTH, aliases=['-d'], description='[deep crawl] set crawl depth')
 
 
 class JobPoolOptions(BaseModel):
@@ -93,21 +105,10 @@ class JobPoolOptions(BaseModel):
         return at_most_one_from_enum(cls, values, JobPool)
 
     def get_pool_size(self) -> Optional[int]:
-        return self.pool_size if hasattr(self, 'pool_size') else DebugPanelApp.DEFAULT_POOL_SIZE
+        return self.pool_size if hasattr(self, 'pool_size') else DEFAULT_POOL_SIZE
 
     def get_pool_type(self) -> JobPool:
-        return get_from_enum(self, JobPool, DebugPanelApp.DEFAULT_POOL_TYPE)
-
-
-class OutputFormatOptions(BaseModel):
-    debug_cli: Optional[bool] = Field(False, description='print the result of parsing command line arguments')
-    output_format: Optional[str] = Field(_DEFAULT_OUTPUT_FORMAT, description=f'[output] set the output format; choices: {', '.join(tabulate.tabulate_formats)}')
-
-    @validator('output_format')
-    def _validate_output_format(cls, v: str):
-        if v not in tabulate.tabulate_formats:
-            raise ValueError(f'must be one of {', '.join(tabulate.tabulate_formats)}; got {v}')
-        return v
+        return get_from_enum(self, JobPool, DEFAULT_POOL_TYPE)
 
 
 class NodeCommand(OutputFormatOptions, JobPoolOptions, NodesOptions): pass
@@ -139,80 +140,128 @@ class DebugPanelCommand(BaseModel):
     version: Optional[StringCommand.type(__version__)] = Field(description=VERSION_DESCRIPTION)
 
 
-class DebugPanelCli(DebugPanelApp, BaseCli[DebugPanelCommand]):
+class DebugPanelCli(BaseCli[DebugPanelCommand]):
 
     def __init__(self):
-        DebugPanelApp.__init__(self)
-        BaseCli.__init__(self,
-                         model=DebugPanelCommand,
+        super().__init__(model=DebugPanelCommand,
                          prog='debugpanel',
                          description='Tool to interact with the LOCKSS 1.x DebugPanel servlet')
+        self._auids: Optional[List[str]] = None
+        self._auth: Optional[Any] = None
+        self._executor: Optional[Executor] = None
+        self._nodes: Optional[List[str]] = None
 
-    def _check_substance(self, check_substance_command: AuidCommand) -> None:
-        self._do_auid_command(check_substance_command, self.check_substance)
+    def _check_substance(self, auid_command: AuidCommand) -> None:
+        self._do_auid_command(auid_command, check_substance)
 
-    def _copyright(self, copyright_model: StringCommand) -> None:
-        self._do_string_command(copyright_model)
+    def _copyright(self, string_command: StringCommand) -> None:
+        self._do_string_command(string_command)
 
-    def _cp(self, crawl_plugins_command: NodeCommand) -> None:
-        self._crawl_plugins(crawl_plugins_command)
+    def _cp(self, node_command: NodeCommand) -> None:
+        self._crawl_plugins(node_command)
 
-    def _cr(self, crawl_command: AuidCommand) -> None:
-        self._crawl(crawl_command)
+    def _cr(self, auid_command: AuidCommand) -> None:
+        self._crawl(auid_command)
 
-    def _crawl(self, crawl_command: AuidCommand) -> None:
-        self._do_auid_command(crawl_command, self.crawl)
+    def _crawl(self, auid_command: AuidCommand) -> None:
+        self._do_auid_command(auid_command, crawl)
 
-    def _crawl_plugins(self, crawl_plugins_model: NodeCommand) -> None:
-        self._do_node_command(crawl_plugins_model, self.crawl_plugins)
+    def _crawl_plugins(self, node_command: NodeCommand) -> None:
+        self._do_node_command(node_command, crawl_plugins)
 
-    def _cs(self, check_substance_command: AuidCommand) -> None:
-        self._check_substance(check_substance_command)
+    def _cs(self, auid_command: AuidCommand) -> None:
+        self._check_substance(auid_command)
 
     def _dc(self, deep_crawl_command: DeepCrawlCommand) -> None:
         self._deep_crawl(deep_crawl_command)
 
     def _deep_crawl(self, deep_crawl_command: DeepCrawlCommand) -> None:
-        self._do_auid_command(deep_crawl_command, self.deep_crawl, depth=deep_crawl_command.depth)
+        self._do_auid_command(deep_crawl_command, deep_crawl, depth=deep_crawl_command.depth)
 
-    def _di(self, disable_indexing_command: AuidCommand) -> None:
-        self._disable_indexing(disable_indexing_command)
+    def _di(self, auid_command: AuidCommand) -> None:
+        self._disable_indexing(auid_command)
 
-    def _disable_indexing(self, disable_indexing_command: AuidCommand) -> None:
-        self._do_auid_command(disable_indexing_command, self.disable_indexing)
+    def _disable_indexing(self, auid_command: AuidCommand) -> None:
+        self._do_auid_command(auid_command, disable_indexing)
 
-    def _do_auid_command(self, auid_command: AuidCommand, func: Callable, **kwargs) -> None:
-        self.add_auids(*auid_command.get_auids())
-        self._do_node_command(auid_command, func, **kwargs)
+    def _do_auid_command(self, auid_command: AuidCommand, node_auid_func: Callable[[Node, str], Any], **kwargs) -> None:
+        self._initialize_auth(auid_command)
+        self._initialize_executor(auid_command)
+        self._nodes = auid_command.get_nodes()
+        self._auids = auid_command.get_auids()
+        node_objects = [Node(node, *self._auth) for node in self._nodes]
+        futures: Dict[Future, Tuple[str, str]] = {self._executor.submit(node_auid_func, node_object, auid, **kwargs): (node, auid) for auid in self._auids for node, node_object in zip(self._nodes, node_objects)}
+        results: Dict[Tuple[str, str], Any] = {}
+        for future in as_completed(futures):
+            node_auid = futures[future]
+            try:
+                resp = future.result()
+                status, reason = resp.status, resp.reason
+                results[node_auid] = 'Requested' if status == 200 else reason
+            except Exception as exc:
+                results[node_auid] = exc
+        print(tabulate([[auid, *[results[(node, auid)] for node in self._nodes]] for auid in self._auids],
+                       headers=['AUID', *self._nodes],
+                       tablefmt=auid_command.output_format))
 
-    def _do_node_command(self, nodes_command: NodeCommand, func: Callable, **kwargs) -> None:
-        self.add_nodes(*nodes_command.get_nodes())
-        self._initialize_auth(nodes_command)
-        self.set_pool_size(nodes_command.get_pool_size())
-        self.set_pool_type(nodes_command.get_pool_type())
-        func(**kwargs)
+    def _do_node_command(self, node_command: NodeCommand, node_func: Callable[[Node], Any], **kwargs) -> None:
+        self._initialize_auth(node_command)
+        self._initialize_executor(node_command)
+        self._nodes = node_command.get_nodes()
+        node_objects = [Node(node, *self._auth) for node in self._nodes]
+        futures: Dict[Future, str] = {self._executor.submit(node_func, node_object): node for node, node_object in zip(self._nodes, node_objects)}
+        results: Dict[str, Any] = {}
+        for future in as_completed(futures):
+            node = futures[future]
+            try:
+                resp = future.result()
+                status, reason = resp.status, resp.reason
+                results[node] = 'Requested' if status == 200 else reason
+            except Exception as exc:
+                results[node] = exc
+        print(tabulate([[node, results[node]] for node in self._nodes],
+                       headers=['Node', 'Result'],
+                       tablefmt=node_command.output_format))
 
     def _do_string_command(self, string_command: StringCommand) -> None:
-        string_command.action()
+        string_command()
 
-    def _license(self, license_model: StringCommand) -> None:
-        self._do_string_command(license_model)
+    def _initialize_auth(self, nodes_options: NodesOptions):
+        _u = nodes_options.username or input('UI username: ')
+        _p = nodes_options.password or getpass('UI password: ')
+        self._auth = (_u, _p)
+
+    def _initialize_executor(self, job_pool_options: JobPoolOptions):
+        if job_pool_options.get_pool_type() == JobPool.thread_pool:
+            self._executor = ThreadPoolExecutor(max_workers=job_pool_options.get_pool_size())
+        elif job_pool_options.get_pool_type() == JobPool.process_pool:
+            self._executor = ProcessPoolExecutor(max_workers=job_pool_options.get_pool_size())
+        else:
+            raise InternalError()
+
+    def _license(self, string_command: StringCommand) -> None:
+        self._do_string_command(string_command)
+
+    def _po(self, auid_command: AuidCommand) -> None:
+        self._poll(auid_command)
+
+    def _poll(self, auid_command: AuidCommand) -> None:
+        self._do_auid_command(auid_command, poll)
 
     def _rc(self, node_command: NodeCommand):
         self._reload_config(node_command)
 
     def _reload_config(self, node_command: NodeCommand):
-        self._do_node_command(node_command, self.reload_config)
+        self._do_node_command(node_command, reload_config)
 
-    def _version(self, version_model: StringCommand) -> None:
-        self._do_string_command(version_model)
+    def _validate_files(self, auid_command: AuidCommand) -> None:
+        self._do_auid_command(auid_command, validate_files)
 
-    def _initialize_auth(self, nodes_model):
-        # FIXME someday
-        _u = nodes_model.username or input('UI username: ')
-        _p = nodes_model.password or getpass('UI password: ')
-        self._auth = (_u, _p)
+    def _vf(self, auid_command: AuidCommand) -> None:
+        self._validate_files(auid_command)
 
+    def _version(self, string_command: StringCommand) -> None:
+        self._do_string_command(string_command)
 
 def main():
     DebugPanelCli().run()

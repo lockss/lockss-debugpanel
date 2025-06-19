@@ -34,90 +34,93 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 '''.strip()
 
-import base64
-import urllib.request
+
+from base64 import b64encode
+from urllib.request import Request, urlopen
+from typing import Any
 
 
 DEFAULT_DEPTH = 123
 
 
-def check_substance(node_object, auid):
-    return _auid_action(node_object, auid, 'Check Substance')
-
-
-def crawl(node_object, auid):
-    return _auid_action(node_object, auid, 'Force Start Crawl')
-
-
-def crawl_plugins(node_object):
-    return _node_action(node_object, 'Crawl Plugins')
-
-
-def deep_crawl(node_object, auid, depth=DEFAULT_DEPTH):
-    return _auid_action(node_object, auid, 'Force Deep Crawl', depth=depth)
-
-
-def disable_indexing(node_object, auid):
-    return _auid_action(node_object, auid, 'Disable Indexing')
-
-
-def node(node_reference, u, p):
-    return _Node(node_reference, u, p)
-
-
-def poll(node_object, auid):
-    return _auid_action(node_object, auid, 'Start V3 Poll')
-
-
-def reindex_metadata(node_object, auid):
-    return _auid_action(node_object, auid, 'Force Reindex Metadata')
-
-
-def reload_config(node_object):
-    return _node_action(node_object, 'Reload Config')
-
-
-def validate_files(node_object, auid):
-    return _auid_action(node_object, auid, 'Validate Files')
-
-
-class _Node(object):
+class Node(object):
 
     DEFAULT_PROTOCOL = 'http'
 
-    def __init__(self, node_reference, u, p):
+    def __init__(self, node_reference: str, u: str, p: str) -> None:
         super().__init__()
         if '://' not in node_reference:
-            node_reference = f'{_Node.DEFAULT_PROTOCOL}://{node_reference}'
+            node_reference = f'{Node.DEFAULT_PROTOCOL}://{node_reference}'
         if node_reference.endswith('/'):
             node_reference = node_reference[:-1]
-        self._url = node_reference
-        self._basic = base64.b64encode(f'{u}:{p}'.encode('utf-8')).decode('utf-8')
+        self._url: str = node_reference
+        self._basic: bytes = b64encode(f'{u}:{p}'.encode('utf-8')).decode('utf-8')
 
-    def authenticate(self, req):
+    def authenticate(self, req) -> None:
         req.add_header('Authorization', f'Basic {self._basic}')
 
-    def get_url(self):
+    def get_url(self) -> str:
         return self._url
 
 
-def _auid_action(node_object, auid, action, **kwargs):
+def check_substance(node: Node, auid: str):
+    return _auid_action(node, auid, 'Check Substance')
+
+
+def crawl(node: Node, auid: str):
+    return _auid_action(node, auid, 'Force Start Crawl')
+
+
+def crawl_plugins(node: Node):
+    return _node_action(node, 'Crawl Plugins')
+
+
+def deep_crawl(node: Node, auid: str, depth=DEFAULT_DEPTH):
+    return _auid_action(node, auid, 'Force Deep Crawl', depth=depth)
+
+
+def disable_indexing(node: Node, auid: str):
+    return _auid_action(node, auid, 'Disable Indexing')
+
+
+def node(node_reference: str, u: str, p: str):
+    return Node(node_reference, u, p)
+
+
+def poll(node: Node, auid: str):
+    return _auid_action(node, auid, 'Start V3 Poll')
+
+
+def reindex_metadata(node: Node, auid: str):
+    return _auid_action(node, auid, 'Force Reindex Metadata')
+
+
+def reload_config(node: Node):
+    return _node_action(node, 'Reload Config')
+
+
+def validate_files(node: Node, auid: str):
+    return _auid_action(node, auid, 'Validate Files')
+
+
+def _auid_action(node: Node, auid: str, action: str, **kwargs) -> Any:
     action_encoded = action.replace(" ", "%20")
     auid_encoded = auid.replace('%', '%25').replace('|', '%7C').replace('&', '%26').replace('~', '%7E')
-    req = _make_request(node_object, f'action={action_encoded}&auid={auid_encoded}', **kwargs)
-    return urllib.request.urlopen(req)
+    req = _make_request(node, f'action={action_encoded}&auid={auid_encoded}', **kwargs)
+    resp = urlopen(req)
+    return resp.status, resp.reason
 
 
-def _make_request(node_object, query, **kwargs):
+def _make_request(node: Node, query: str, **kwargs) -> Request:
     for key, val in kwargs.items():
         query = f'{query}&{key}={val}'
-    url = f'{node_object.get_url()}/DebugPanel?{query}'
-    req = urllib.request.Request(url)
-    node_object.authenticate(req)
+    url = f'{node.get_url()}/DebugPanel?{query}'
+    req = Request(url)
+    node.authenticate(req)
     return req
 
 
-def _node_action(node_object, action, **kwargs):
+def _node_action(node: Node, action: str, **kwargs) -> Any:
     action_encoded = action.replace(" ", "%20")
-    req = _make_request(node_object, f'action={action_encoded}', **kwargs)
-    return urllib.request.urlopen(req)
+    req = _make_request(node, f'action={action_encoded}', **kwargs)
+    return urlopen(req)

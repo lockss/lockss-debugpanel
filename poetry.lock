@@ -14,30 +14,31 @@ files = [
 
 [[package]]
 name = "lockss-pybasic"
-version = "0.1.0.dev14"
+version = "0.1.0.dev16"
 description = "Basic Python utilities"
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = [
-    {file = "lockss_pybasic-0.1.0.dev14-py3-none-any.whl", hash = "sha256:2b3303b4c79ad8063391b0ba278860774bbd238e010862c2f29bfe3d667361b4"},
-    {file = "lockss_pybasic-0.1.0.dev14.tar.gz", hash = "sha256:11f5f36eaaa1ef28c21a4416b1ecbb5009e2a391233642b304e54f4dfef02f4b"},
+    {file = "lockss_pybasic-0.1.0.dev16-py3-none-any.whl", hash = "sha256:82b9ed067586d7cc622a17003a52fcefdf8ac45b31c7a2080cc74e8cfec1b3ce"},
+    {file = "lockss_pybasic-0.1.0.dev16.tar.gz", hash = "sha256:aa14938753d7b02c5769609818d4ecb6257f628d5f623a4010397281dc5638f3"},
 ]
 
 [package.dependencies]
 pydantic = ">=2.11.0,<3.0.0"
 pydantic-argparse = ">=0.10.0,<0.11.0"
+tabulate = ">=0.9.0,<0.10.0"
 
 [[package]]
 name = "pydantic"
-version = "2.11.5"
+version = "2.11.7"
 description = "Data validation using Python type hints"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "pydantic-2.11.5-py3-none-any.whl", hash = "sha256:f9c26ba06f9747749ca1e5c94d6a85cb84254577553c8785576fd38fa64dc0f7"},
-    {file = "pydantic-2.11.5.tar.gz", hash = "sha256:7f853db3d0ce78ce8bbb148c401c2cdd6431b3473c0cdff2755c7690952a7b7a"},
+    {file = "pydantic-2.11.7-py3-none-any.whl", hash = "sha256:dde5df002701f6de26248661f6835bbe296a47bf73990135c7d07ce741b9623b"},
+    {file = "pydantic-2.11.7.tar.gz", hash = "sha256:d989c3c6cb79469287b1569f7447a17848c998458d49ebe294e975b9baf0f0db"},
 ]
 
 [package.dependencies]
@@ -222,4 +223,4 @@ typing-extensions = ">=4.12.0"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<4.0"
-content-hash = "b5c67990590c3a7385e2619397ac9c437784c58598e4feab91399346cb5d4f63"
+content-hash = "0ad55e0e61f3ce4c263160d1ab557813063ca71daf77bed08da8e757a2b922fc"

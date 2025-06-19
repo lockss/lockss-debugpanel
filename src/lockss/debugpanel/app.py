@@ -39,15 +39,6 @@ from lockss.pybasic.errorutil import InternalError
 from . import *
 
 
-class JobPool(Enum):
-    thread_pool = 'thread-pool'
-    process_pool = 'process-pool'
-
-    @staticmethod
-    def from_option(name: str):
-        return JobPool(str.replace('-', '_'))
-
-
 # _DEFAULT_DEPTH = 123
 #
 # def _auid_action(node_object, auid, action, **kwargs):
@@ -140,10 +131,10 @@ class DebugPanelApp(object):
         return self
 
     def check_substance(self):
-        self._per_auid(_check_substance)
+        self._per_auid(check_substance)
 
     def crawl(self):
-        self._per_auid(_crawl)
+        self._per_auid(crawl)
 
     def crawl_plugins(self):
         self._per_node(_crawl_plugins)
