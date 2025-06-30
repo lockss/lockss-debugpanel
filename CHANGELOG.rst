@@ -10,7 +10,13 @@ Released: ?
 
 *  **Features**
 
-   *  ?
+   *  Now using *lockss-pybasic* and *pydantic-argparse* internally.
+
+*  **Changes**
+
+   *  Bare arguments are no longer allowed and treated as node references; all node references must be specified via ``--node/-n`` or ``--nodes/-N`` options.
+
+   *  The ``usage`` command has been removed.
 
 -----
 0.7.0

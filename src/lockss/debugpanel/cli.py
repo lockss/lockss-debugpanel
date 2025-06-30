@@ -28,6 +28,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+"""
+Command line tool to interact with the LOCKSS 1.x DebugPanel servlet.
+"""
+
 from collections.abc import Callable
 from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from enum import Enum
@@ -43,15 +47,29 @@ from lockss.pybasic.cliutil import BaseCli, StringCommand, at_most_one_from_enum
 from lockss.pybasic.errorutil import InternalError
 from lockss.pybasic.fileutil import file_lines, path
 from lockss.pybasic.outpututil import OutputFormatOptions
-from . import Node, check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reload_config, reindex_metadata, validate_files, DEFAULT_DEPTH, __copyright__, __license__, __version__
+from . import RequestUrlOpenT, Node, check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reload_config, reindex_metadata, validate_files, DEFAULT_DEPTH, __copyright__, __license__, __version__
 
 
 class JobPool(Enum):
+    """
+    An enum of job pool types.
+
+    See also ``DEFAULT_POOL_TYPE``.
+    """
     thread_pool = 'thread-pool'
     process_pool = 'process-pool'
 
     @staticmethod
-    def from_option(name: str):
+    def from_option(name: str) -> str:
+        """
+        Given an option name with hyphens, return the enum constant name with
+        underscores.
+
+        :param name: An option name with hyphens.
+        :type name: str
+        :return: The corresponding enum constant name with underscores.
+        :rtype: str
+        """
         return JobPool(name.replace('-', '_'))
 
 
@@ -60,10 +78,13 @@ DEFAULT_POOL_TYPE: JobPool = JobPool.thread_pool
 
 
 class NodesOptions(BaseModel):
-    node: Optional[List[str]] = Field([], aliases=['-n'], description='[nodes] add one or more nodes to the set of nodes to process')
-    nodes: Optional[List[FilePath]] = Field([], aliases=['-N'], description='[nodes] add the nodes listed in one or more files to the set of nodes to process')
-    password: Optional[str] = Field(aliases=['-p'], description='[nodes] UI password; interactive prompt if not specified')
-    username: Optional[str] = Field(aliases=['-u'], description='[nodes] UI username; interactive prompt if not unspecified')
+    """
+    The --node/-n, --nodes/-N, --password/-p and --username/-u options.
+    """
+    node: Optional[List[str]] = Field([], aliases=['-n'], description='(nodes) add one or more nodes to the set of nodes to process')
+    nodes: Optional[List[FilePath]] = Field([], aliases=['-N'], description='(nodes) add the nodes listed in one or more files to the set of nodes to process')
+    password: Optional[str] = Field(aliases=['-p'], description='(nodes) UI password; interactive prompt if not specified')
+    username: Optional[str] = Field(aliases=['-u'], description='(nodes) UI username; interactive prompt if not unspecified')
 
     @validator('nodes', each_item=True, pre=True)
     def _expand_each_nodes_path(cls, v: Path):
@@ -77,8 +98,11 @@ class NodesOptions(BaseModel):
 
 
 class AuidsOptions(BaseModel):
-    auid: Optional[List[str]] = Field([], aliases=['-a'], description='[AUIDs] add one or more AUIDs to the set of AUIDs to process')
-    auids: Optional[List[FilePath]] = Field([], aliases=['-A'], description='[AUIDs] add the AUIDs listed in one or more files to the set of AUIDs to process')
+    """
+    The --auid/-a and --auids/-A options.
+    """
+    auid: Optional[List[str]] = Field([], aliases=['-a'], description='(AUIDs) add one or more AUIDs to the set of AUIDs to process')
+    auids: Optional[List[FilePath]] = Field([], aliases=['-A'], description='(AUIDs) add the AUIDs listed in one or more files to the set of AUIDs to process')
 
     @validator('auids', each_item=True, pre=True)
     def _expand_each_auids_path(cls, v: Path):
@@ -92,13 +116,19 @@ class AuidsOptions(BaseModel):
 
 
 class DepthOptions(BaseModel):
-    depth: Optional[int] = Field(DEFAULT_DEPTH, aliases=['-d'], description='[deep crawl] set crawl depth')
+    """
+    The --depth/-d option.
+    """
+    depth: Optional[int] = Field(DEFAULT_DEPTH, aliases=['-d'], description='(deep crawl) set crawl depth')
 
 
 class JobPoolOptions(BaseModel):
-    pool_size: Optional[PositiveInt] = Field(description='[job pool] set the job pool size')
-    process_pool: Optional[bool] = Field(False, description='[job pool] use a process pool', enum=JobPool)
-    thread_pool: Optional[bool] = Field(False, description='[job pool] use a thread pool', enum=JobPool)
+    """
+    The --pool-size, --process-pool and --thread-pool options.
+    """
+    pool_size: Optional[PositiveInt] = Field(description='(job pool) set the job pool size')
+    process_pool: Optional[bool] = Field(False, description='(job pool) use a process pool', enum=JobPool)
+    thread_pool: Optional[bool] = Field(False, description='(job pool) use a thread pool', enum=JobPool)
 
     @root_validator
     def _at_most_one_pool_type(cls, values):
@@ -111,12 +141,29 @@ class JobPoolOptions(BaseModel):
         return get_from_enum(self, JobPool, DEFAULT_POOL_TYPE)
 
 
-class NodeCommand(OutputFormatOptions, JobPoolOptions, NodesOptions): pass
-class AuidCommand(NodeCommand, OutputFormatOptions, JobPoolOptions, AuidsOptions, NodesOptions): pass
-class DeepCrawlCommand(AuidCommand, OutputFormatOptions, JobPoolOptions, DepthOptions, AuidsOptions, NodesOptions): pass
+class NodeCommand(OutputFormatOptions, JobPoolOptions, NodesOptions):
+    """
+    A pydantic-argparse command for node commands.
+    """
+    pass
+
+class AuidCommand(NodeCommand, OutputFormatOptions, JobPoolOptions, AuidsOptions, NodesOptions):
+    """
+    A pydantic-argparse command for AUID commands except deep-crawl.
+    """
+    pass
+
+class DeepCrawlCommand(AuidCommand, OutputFormatOptions, JobPoolOptions, DepthOptions, AuidsOptions, NodesOptions):
+    """
+    A pydantic-argparse command for deep-crawl.
+    """
+    pass
 
 
 class DebugPanelCommand(BaseModel):
+    """
+    The pydantic-argparse model for the top-level debugpanel command.
+    """
     check_substance: Optional[AuidCommand] = Field(description='cause nodes to check the substance of AUs', alias='check-substance')
     copyright: Optional[StringCommand.type(__copyright__)] = Field(description=COPYRIGHT_DESCRIPTION)
     cp: Optional[NodeCommand] = Field(description='synonym for: crawl-plugins')
@@ -127,7 +174,7 @@ class DebugPanelCommand(BaseModel):
     dc: Optional[DeepCrawlCommand] = Field(description='synonym for: deep-crawl')
     deep_crawl: Optional[DeepCrawlCommand] = Field(description='cause nodes to deeply crawl AUs', alias='deep-crawl')
     di: Optional[AuidCommand] = Field(description='synonym for: disable-indexing')
-    disable_indexing: Optional[AuidCommand] = Field(description='cause nodes to disable indexing for AUs', alias='disable-indexing')
+    disable_indexing: Optional[AuidCommand] = Field(description='cause nodes to disable metadata indexing for AUs', alias='disable-indexing')
     license: Optional[StringCommand.type(__license__)] = Field(description=LICENSE_DESCRIPTION)
     po: Optional[AuidCommand] = Field(description='synonym for: poll')
     poll: Optional[AuidCommand] = Field(description='cause nodes to poll AUs')
@@ -136,13 +183,19 @@ class DebugPanelCommand(BaseModel):
     reload_config: Optional[NodeCommand] = Field(description='cause nodes to reload their configuration', alias='reload-config')
     ri: Optional[AuidCommand] = Field(description='synonym for: reindex-metadata')
     validate_files: Optional[AuidCommand] = Field(description='cause nodes to validate the files of AUs', alias='validate-files')
-    vf: Optional[AuidCommand] = Field(description='synonym for: validate-files')
     version: Optional[StringCommand.type(__version__)] = Field(description=VERSION_DESCRIPTION)
+    vf: Optional[AuidCommand] = Field(description='synonym for: validate-files')
 
 
 class DebugPanelCli(BaseCli[DebugPanelCommand]):
+    """
+    The debugpanel command line tool.
+    """
 
     def __init__(self):
+        """
+        Constructs a new ``DebugPanelCli`` instance.
+        """
         super().__init__(model=DebugPanelCommand,
                          prog='debugpanel',
                          description='Tool to interact with the LOCKSS 1.x DebugPanel servlet')
@@ -184,7 +237,7 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
     def _disable_indexing(self, auid_command: AuidCommand) -> None:
         self._do_auid_command(auid_command, disable_indexing)
 
-    def _do_auid_command(self, auid_command: AuidCommand, node_auid_func: Callable[[Node, str], Any], **kwargs) -> None:
+    def _do_auid_command(self, auid_command: AuidCommand, node_auid_func: Callable[[Node, str], RequestUrlOpenT], **kwargs) -> None:
         self._initialize_auth(auid_command)
         self._initialize_executor(auid_command)
         self._nodes = auid_command.get_nodes()
@@ -195,8 +248,9 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
         for future in as_completed(futures):
             node_auid = futures[future]
             try:
-                resp = future.result()
-                status, reason = resp.status, resp.reason
+                resp: RequestUrlOpenT = future.result()
+                status: int = resp.status
+                reason: str = resp.reason
                 results[node_auid] = 'Requested' if status == 200 else reason
             except Exception as exc:
                 results[node_auid] = exc
@@ -204,18 +258,19 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
                        headers=['AUID', *self._nodes],
                        tablefmt=auid_command.output_format))
 
-    def _do_node_command(self, node_command: NodeCommand, node_func: Callable[[Node], Any], **kwargs) -> None:
+    def _do_node_command(self, node_command: NodeCommand, node_func: Callable[[Node], RequestUrlOpenT], **kwargs) -> None:
         self._initialize_auth(node_command)
         self._initialize_executor(node_command)
         self._nodes = node_command.get_nodes()
         node_objects = [Node(node, *self._auth) for node in self._nodes]
-        futures: Dict[Future, str] = {self._executor.submit(node_func, node_object): node for node, node_object in zip(self._nodes, node_objects)}
+        futures: Dict[Future, str] = {self._executor.submit(node_func, node_object, **kwargs): node for node, node_object in zip(self._nodes, node_objects)}
         results: Dict[str, Any] = {}
         for future in as_completed(futures):
             node = futures[future]
             try:
-                resp = future.result()
-                status, reason = resp.status, resp.reason
+                resp: RequestUrlOpenT = future.result()
+                status: int = resp.status
+                reason: str = resp.reason
                 results[node] = 'Requested' if status == 200 else reason
             except Exception as exc:
                 results[node] = exc
@@ -251,6 +306,12 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
     def _rc(self, node_command: NodeCommand):
         self._reload_config(node_command)
 
+    def _ri(self, auid_command: AuidCommand) -> None:
+        self._reindex_metadata(auid_command)
+
+    def _reindex_metadata(self, auid_command: AuidCommand) -> None:
+        self._do_auid_command(auid_command, reindex_metadata)
+
     def _reload_config(self, node_command: NodeCommand):
         self._do_node_command(node_command, reload_config)
 
@@ -262,6 +323,7 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
 
     def _version(self, string_command: StringCommand) -> None:
         self._do_string_command(string_command)
+
 
 def main():
     DebugPanelCli().run()
