@@ -6,7 +6,7 @@ Release Notes
 0.8.0
 -----
 
-Released: ?
+Released: 2025-08-01
 
 *  **Features**
 
