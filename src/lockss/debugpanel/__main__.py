@@ -29,7 +29,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 """
-Entry point for the ``lockss.warcread`` module.
+Entry point for the ``lockss.debugpanel`` module.
 """
 
 from .cli import main

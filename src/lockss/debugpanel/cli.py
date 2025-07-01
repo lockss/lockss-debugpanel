@@ -369,7 +369,7 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
 
 def main() -> None:
     """
-    Entry point for the warcread command line tool.
+    Entry point for the debugpanel command line tool.
     """
     DebugPanelCli().run()
 
