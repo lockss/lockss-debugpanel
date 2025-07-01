@@ -265,6 +265,7 @@ def validate_files(node: Node, auid: str) -> RequestUrlOpenT:
 
 def _auid_action(node: Node, auid: str, action: str, **kwargs) -> RequestUrlOpenT:
     """
+    Performs one AUID-centric action.
 
     :param node: A ``Node`` instance.
     :type node: Node
@@ -288,6 +289,7 @@ def _auid_action(node: Node, auid: str, action: str, **kwargs) -> RequestUrlOpen
 
 def _make_request(node: Node, query: str, **kwargs) -> Request:
     """
+    Constructs and authenticates an HTTP request.
 
     :param node: A ``Node`` instance.
     :type node: Node
@@ -311,6 +313,7 @@ def _make_request(node: Node, query: str, **kwargs) -> Request:
 
 def _node_action(node: Node, action: str, **kwargs) -> RequestUrlOpenT:
     """
+    Performs one node-centric action.
 
     :param node: A ``Node`` instance.
     :type node: Node

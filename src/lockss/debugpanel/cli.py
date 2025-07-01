@@ -237,7 +237,19 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
     def _disable_indexing(self, auid_command: AuidCommand) -> None:
         self._do_auid_command(auid_command, disable_indexing)
 
-    def _do_auid_command(self, auid_command: AuidCommand, node_auid_func: Callable[[Node, str], RequestUrlOpenT], **kwargs) -> None:
+    def _do_auid_command(self, auid_command: AuidCommand, node_auid_func: Callable[[Node, str], RequestUrlOpenT], **kwargs: Dict[str, Any]) -> None:
+        """
+        Performs one AUID-centric command.
+
+        :param auid_command: An ``AuidCommand`` model.
+        :type auid_command: AuidCommand
+        :param node_auid_func: A function that applies to a ``Node`` and an AUID
+                               and returns what ``urllib.request.urlopen``
+                               returns.
+        :type node_auid_func: ``RequestUrlOpenT``
+        :param kwargs: Keyword arguments (needed for the ``depth`` command).
+        :type kwargs: Dict[str, Any]
+        """
         self._initialize_auth(auid_command)
         self._initialize_executor(auid_command)
         self._nodes = auid_command.get_nodes()
@@ -258,7 +270,18 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
                        headers=['AUID', *self._nodes],
                        tablefmt=auid_command.output_format))
 
-    def _do_node_command(self, node_command: NodeCommand, node_func: Callable[[Node], RequestUrlOpenT], **kwargs) -> None:
+    def _do_node_command(self, node_command: NodeCommand, node_func: Callable[[Node], RequestUrlOpenT], **kwargs: Dict[str, Any]) -> None:
+        """
+        Performs one node-centric command.
+
+        :param node_command: A ``NodeCommand`` model.
+        :type auid_command: NodeCommand
+        :param node_func: A function that applies to a ``Node`` and returns
+                          what ``urllib.request.urlopen`` returns.
+        :type node_auid_func: ``RequestUrlOpenT``
+        :param kwargs: Keyword arguments (not currently needed by any command).
+        :type kwargs: Dict[str, Any]
+        """
         self._initialize_auth(node_command)
         self._initialize_executor(node_command)
         self._nodes = node_command.get_nodes()
@@ -279,14 +302,33 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
                        tablefmt=node_command.output_format))
 
     def _do_string_command(self, string_command: StringCommand) -> None:
+        """
+        Performs one string command.
+
+        :param string_command: A ``StringCommand`` model.
+        :type auid_command: StringCommand
+        """
         string_command()
 
-    def _initialize_auth(self, nodes_options: NodesOptions):
+    def _initialize_auth(self, nodes_options: NodesOptions) -> None:
+        """
+        Computes the ``self._auth`` value, possibly after asking for interactive
+        input.
+
+        :param nodes_options: A ``NodesOptions`` model.
+        :type node_options: ``NodesOptions``
+        """
         _u = nodes_options.username or input('UI username: ')
         _p = nodes_options.password or getpass('UI password: ')
         self._auth = (_u, _p)
 
-    def _initialize_executor(self, job_pool_options: JobPoolOptions):
+    def _initialize_executor(self, job_pool_options: JobPoolOptions) -> None:
+        """
+        Initializes the ``Executor``.
+
+        :param job_pool_options: A ``JobPoolOptions`` model.
+        :type job_pool_options: ``JobPoolOptions``.
+        """
         if job_pool_options.get_pool_type() == JobPool.thread_pool:
             self._executor = ThreadPoolExecutor(max_workers=job_pool_options.get_pool_size())
         elif job_pool_options.get_pool_type() == JobPool.process_pool:
@@ -325,7 +367,10 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
         self._do_string_command(string_command)
 
 
-def main():
+def main() -> None:
+    """
+    Entry point for the warcread command line tool.
+    """
     DebugPanelCli().run()
 
 
