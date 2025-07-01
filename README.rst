@@ -15,7 +15,7 @@ Debugpanel
    :alt: Debugpanel logo
    :align: right
 
-Debugpanel is a library and command line tool to interact with the LOCKSS 1.x DebugPanel servlet
+Debugpanel is a library and command line tool to interact with the LOCKSS 1.x DebugPanel servlet.
 
 :Latest release: |RELEASE| (|RELEASE_DATE|)
 :Release notes: `<CHANGELOG.rst>`_
