@@ -179,7 +179,6 @@ Synopsis
 
 Debugpanel uses `Commands`_, in the style of programs like ``git``, ``dnf``/``yum``, ``apt``/``apt-get``, and the like. You can see the list of available `Commands`_ by invoking ``debugpanel --help``::
 
-    $ debugpanel --help
     Usage: debugpanel [-h]
                       {check-substance,copyright,cp,cr,crawl,crawl-plugins,cs,dc,deep-crawl,di,disable-indexing,license,po,poll,rc,reindex-metadata,reload-config,ri,validate-files,version,vf} ...
 
@@ -531,6 +530,8 @@ The command needs:
 *  One or more AUIDs, from the `AUID Options`_ (|AUID| options, |AUIDS| options).
 
 It also accepts `Output Format Options`_ and `Job Pool Options`_.
+
+.. _license:
 
 ``license``
 -----------
