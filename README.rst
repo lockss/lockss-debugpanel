@@ -531,7 +531,7 @@ The command needs:
 
 It also accepts `Output Format Options`_ and `Job Pool Options`_.
 
-.. _license:
+.. COMMENT PyPI won't accept an anchor here meaning the double backticks don't make it different
 
 ``license``
 -----------
