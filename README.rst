@@ -531,8 +531,6 @@ The command needs:
 
 It also accepts `Output Format Options`_ and `Job Pool Options`_.
 
-.. _license:
-
 ``license``
 -----------
 
