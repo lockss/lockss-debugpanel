@@ -9,6 +9,16 @@ Release Notes
 Released: ?
 
 -----
+0.8.1
+-----
+
+Released: 2025-08-13
+
+*  **Bug Fixes**
+
+   *  Fixed bug in the processing of ``--nodes`` and ``--auids`` options.
+
+-----
 0.8.0
 -----
 
