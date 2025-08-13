@@ -36,6 +36,7 @@ from collections.abc import Callable
 from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from enum import Enum
 from getpass import getpass
+from itertools import chain
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -47,7 +48,7 @@ from lockss.pybasic.cliutil import BaseCli, StringCommand, at_most_one_from_enum
 from lockss.pybasic.errorutil import InternalError
 from lockss.pybasic.fileutil import file_lines, path
 from lockss.pybasic.outpututil import OutputFormatOptions
-from . import RequestUrlOpenT, Node, check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reload_config, reindex_metadata, validate_files, DEFAULT_DEPTH, __copyright__, __license__, __version__
+from . import Node, RequestUrlOpenT, check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reload_config, reindex_metadata, validate_files, DEFAULT_DEPTH, __copyright__, __license__, __version__
 
 
 class JobPool(Enum):
@@ -91,7 +92,7 @@ class NodesOptions(BaseModel):
         return path(v)
 
     def get_nodes(self):
-        ret = [*self.node[:], *[file_lines(file_path) for file_path in self.nodes]]
+        ret = [*self.node, *chain.from_iterable(file_lines(file_path) for file_path in self.nodes)]
         if len(ret) == 0:
             raise RuntimeError('empty list of nodes')
         return ret
@@ -109,7 +110,7 @@ class AuidsOptions(BaseModel):
         return path(v)
 
     def get_auids(self):
-        ret = [*self.auid[:], *[file_lines(file_path) for file_path in self.auids]]
+        ret = [*self.auid, *chain.from_iterable(file_lines(file_path) for file_path in self.auids)]
         if len(ret) == 0:
             raise RuntimeError('empty list of AUIDs')
         return ret
