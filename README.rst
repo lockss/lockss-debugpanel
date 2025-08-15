@@ -33,9 +33,13 @@ Quick Start::
    debugpanel reload-config -n lockss1.example.edu:8081
 
    # Crawl AUIDs from list.txt on lockss1.example.edu:8081 and lockss2.example.edu:8081
-   # ...First alternative: each node gets a -n
+
+   # ...First alternative: each node gets a -n option
    debugpanel crawl -A list.txt -n lockss1.example.edu:8081 -n lockss2.example.edu:8081
 
-   # ...Second alternative: each -n can have more than argument
+   # ...Second alternative: each -n option can have arguments
    debugpanel crawl -A list.txt -n lockss1.example.edu:8081 lockss2.example.edu:8081
+
+   # ...Third alternative: list lockss1.example.edu:8081 and lockss2.example.edu:8081 in nodes.txt
+   debugpanel crawl -A list.txt -N nodes.txt
 
