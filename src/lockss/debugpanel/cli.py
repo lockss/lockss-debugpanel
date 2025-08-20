@@ -38,7 +38,7 @@ from enum import Enum
 from getpass import getpass
 from itertools import chain
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 from pydantic.v1 import BaseModel, Field, FilePath, root_validator, validator
 from pydantic.v1.types import PositiveInt
@@ -82,8 +82,8 @@ class NodesOptions(BaseModel):
     """
     The --node/-n, --nodes/-N, --password/-p and --username/-u options.
     """
-    node: Optional[List[str]] = Field([], aliases=['-n'], description='(nodes) add one or more nodes to the set of nodes to process')
-    nodes: Optional[List[FilePath]] = Field([], aliases=['-N'], description='(nodes) add the nodes listed in one or more files to the set of nodes to process')
+    node: Optional[list[str]] = Field(aliases=['-n'], description='(nodes) add one or more nodes to the set of nodes to process')
+    nodes: Optional[list[FilePath]] = Field(aliases=['-N'], description='(nodes) add the nodes listed in one or more files to the set of nodes to process')
     password: Optional[str] = Field(aliases=['-p'], description='(nodes) UI password; interactive prompt if not specified')
     username: Optional[str] = Field(aliases=['-u'], description='(nodes) UI username; interactive prompt if not unspecified')
 
@@ -92,7 +92,7 @@ class NodesOptions(BaseModel):
         return path(v)
 
     def get_nodes(self):
-        ret = [*self.node, *chain.from_iterable(file_lines(file_path) for file_path in self.nodes)]
+        ret = [*(self.node or []), *chain.from_iterable(file_lines(file_path) for file_path in self.nodes or [])]
         if len(ret) == 0:
             raise RuntimeError('empty list of nodes')
         return ret
@@ -102,15 +102,15 @@ class AuidsOptions(BaseModel):
     """
     The --auid/-a and --auids/-A options.
     """
-    auid: Optional[List[str]] = Field([], aliases=['-a'], description='(AUIDs) add one or more AUIDs to the set of AUIDs to process')
-    auids: Optional[List[FilePath]] = Field([], aliases=['-A'], description='(AUIDs) add the AUIDs listed in one or more files to the set of AUIDs to process')
+    auid: Optional[list[str]] = Field(aliases=['-a'], description='(AUIDs) add one or more AUIDs to the set of AUIDs to process')
+    auids: Optional[list[FilePath]] = Field(aliases=['-A'], description='(AUIDs) add the AUIDs listed in one or more files to the set of AUIDs to process')
 
     @validator('auids', each_item=True, pre=True)
     def _expand_each_auids_path(cls, v: Path):
         return path(v)
 
-    def get_auids(self):
-        ret = [*self.auid, *chain.from_iterable(file_lines(file_path) for file_path in self.auids)]
+    def get_auids(self) -> list[str]:
+        ret = [*(self.auid or []), *chain.from_iterable(file_lines(file_path) for file_path in self.auids or [])]
         if len(ret) == 0:
             raise RuntimeError('empty list of AUIDs')
         return ret
@@ -200,10 +200,10 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
         super().__init__(model=DebugPanelCommand,
                          prog='debugpanel',
                          description='Tool to interact with the LOCKSS 1.x DebugPanel servlet')
-        self._auids: Optional[List[str]] = None
+        self._auids: Optional[list[str]] = None
         self._auth: Optional[Any] = None
         self._executor: Optional[Executor] = None
-        self._nodes: Optional[List[str]] = None
+        self._nodes: Optional[list[str]] = None
 
     def _check_substance(self, auid_command: AuidCommand) -> None:
         self._do_auid_command(auid_command, check_substance)
@@ -238,7 +238,7 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
     def _disable_indexing(self, auid_command: AuidCommand) -> None:
         self._do_auid_command(auid_command, disable_indexing)
 
-    def _do_auid_command(self, auid_command: AuidCommand, node_auid_func: Callable[[Node, str], RequestUrlOpenT], **kwargs: Dict[str, Any]) -> None:
+    def _do_auid_command(self, auid_command: AuidCommand, node_auid_func: Callable[[Node, str], RequestUrlOpenT], **kwargs: dict[str, Any]) -> None:
         """
         Performs one AUID-centric command.
 
@@ -256,8 +256,8 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
         self._nodes = auid_command.get_nodes()
         self._auids = auid_command.get_auids()
         node_objects = [Node(node, *self._auth) for node in self._nodes]
-        futures: Dict[Future, Tuple[str, str]] = {self._executor.submit(node_auid_func, node_object, auid, **kwargs): (node, auid) for auid in self._auids for node, node_object in zip(self._nodes, node_objects)}
-        results: Dict[Tuple[str, str], Any] = {}
+        futures: dict[Future, tuple[str, str]] = {self._executor.submit(node_auid_func, node_object, auid, **kwargs): (node, auid) for auid in self._auids for node, node_object in zip(self._nodes, node_objects)}
+        results: dict[tuple[str, str], Any] = {}
         for future in as_completed(futures):
             node_auid = futures[future]
             try:
@@ -271,7 +271,7 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
                        headers=['AUID', *self._nodes],
                        tablefmt=auid_command.output_format))
 
-    def _do_node_command(self, node_command: NodeCommand, node_func: Callable[[Node], RequestUrlOpenT], **kwargs: Dict[str, Any]) -> None:
+    def _do_node_command(self, node_command: NodeCommand, node_func: Callable[[Node], RequestUrlOpenT], **kwargs: dict[str, Any]) -> None:
         """
         Performs one node-centric command.
 
@@ -287,8 +287,8 @@ class DebugPanelCli(BaseCli[DebugPanelCommand]):
         self._initialize_executor(node_command)
         self._nodes = node_command.get_nodes()
         node_objects = [Node(node, *self._auth) for node in self._nodes]
-        futures: Dict[Future, str] = {self._executor.submit(node_func, node_object, **kwargs): node for node, node_object in zip(self._nodes, node_objects)}
-        results: Dict[str, Any] = {}
+        futures: dict[Future, str] = {self._executor.submit(node_func, node_object, **kwargs): node for node, node_object in zip(self._nodes, node_objects)}
+        results: dict[str, Any] = {}
         for future in as_completed(futures):
             node = futures[future]
             try:

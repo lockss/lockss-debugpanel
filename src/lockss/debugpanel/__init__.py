@@ -41,7 +41,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 from base64 import b64encode
 from urllib.request import Request, urlopen
-from typing import Any, Dict
+from typing import Any
 
 
 type RequestUrlOpenT = Any
@@ -275,7 +275,7 @@ def _auid_action(node: Node, auid: str, action: str, **kwargs) -> RequestUrlOpen
                    ``Force Deep Crawl``.
     :type action: str
     :param kwargs: Key-value pairs of additional query string arguments.
-    :type kwargs: Dict[str, Any]
+    :type kwargs: dict[str, Any]
     :return: The result of calling `urllib.request.urlopen`` on an appropriate
              URL.
     :rtype: RequestUrlOpenT
@@ -298,7 +298,7 @@ def _make_request(node: Node, query: str, **kwargs) -> Request:
     :type query: str
     :param kwargs: Key-value pairs of additional query string arguments, e.g.
                    ``(..., depth=99)`` to add ``"&depth=99"``.
-    :type kwargs: Dict[str, Any]
+    :type kwargs: dict[str, Any]
     :return: An authenticated ``Request`` instance (before
              ``urllib.request.urlopen`` is called).
     :rtype: Request
@@ -322,7 +322,7 @@ def _node_action(node: Node, action: str, **kwargs) -> RequestUrlOpenT:
     :type action: str
     :param kwargs: Key-value pairs of additional query string arguments, e.g.
                    ``(..., depth=99)`` to add ``"&depth=99"``.
-    :type kwargs: Dict[str, Any]
+    :type kwargs: dict[str, Any]
     :return: The result of calling `urllib.request.urlopen`` on an appropriate
              URL.
     :rtype: RequestUrlOpenT
