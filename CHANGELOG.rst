@@ -14,7 +14,7 @@ Released: ?
 
 Released: 2026-02-03
 
-   *  Requires Python 3.9-3.13.
+*  Requires Python 3.9-3.13.
 
 -----
 0.8.1
