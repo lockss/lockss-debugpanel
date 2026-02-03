@@ -9,6 +9,14 @@ Release Notes
 Released: ?
 
 -----
+0.8.2
+-----
+
+Released: 2026-02-03
+
+   *  Requires Python 3.9-3.13.
+
+-----
 0.8.1
 -----
 
