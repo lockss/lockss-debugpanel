@@ -2,8 +2,8 @@
 Debugpanel
 ==========
 
-.. |RELEASE| replace:: 0.8.1
-.. |RELEASE_DATE| replace:: 2025-08-13
+.. |RELEASE| replace:: 0.8.1-post1
+.. |RELEASE_DATE| replace:: 2026-02-03
 .. |DEBUGPANEL| replace:: **Debugpanel**
 
 .. image:: https://assets.lockss.org/images/logos/debugpanel/debugpanel_128x128.png
@@ -22,6 +22,9 @@ Debugpanel
 ----
 
 Quick Start::
+
+   # Requires Python 3.9-3.13
+   python --version
 
    # Install with pipx
    pipx install lockss-debugpanel

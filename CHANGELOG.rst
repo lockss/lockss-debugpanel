@@ -12,6 +12,10 @@ Released: 2025-08-13
 
    *  Fixed bug in the processing of ``--nodes`` and ``--auids`` options.
 
+*  **Version 0.8.1-post1** (released: 2026-02-03)
+
+   *  Requires Python 3.9-3.13.
+
 -----
 0.8.0
 -----

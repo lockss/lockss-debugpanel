@@ -32,7 +32,7 @@
 Library and command line tool to interact with the LOCKSS 1.x DebugPanel servlet.
 """
 
-__version__ = '0.8.1'
+__version__ = '0.8.1-post1'
 
 __copyright__ = '''
 Copyright (c) 2000-2025, Board of Trustees of Leland Stanford Jr. University
