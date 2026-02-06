@@ -6,7 +6,7 @@ Release Notes
 0.9.0
 -----
 
-Released: ?
+Released: NOT YET RELEASED
 
 -----
 0.8.2

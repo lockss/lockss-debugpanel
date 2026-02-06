@@ -2,8 +2,8 @@
 Debugpanel
 ==========
 
-.. |RELEASE| replace:: 0.8.2
-.. |RELEASE_DATE| replace:: 2026-02-03
+.. |RELEASE| replace:: 0.9.0-dev1
+.. |RELEASE_DATE| replace:: NOT YET RELEASED
 .. |DEBUGPANEL| replace:: **Debugpanel**
 
 .. image:: https://assets.lockss.org/images/logos/debugpanel/debugpanel_128x128.png

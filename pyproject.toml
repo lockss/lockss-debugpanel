@@ -32,7 +32,7 @@ version = "0.9.0-dev1" # Always change in __init__.py, and at release time in RE
 description = "Command line tool and Python library to interact with the LOCKSS 1.x DebugPanel servlet"
 license = { text = "BSD-3-Clause" }
 readme = "README.rst"
-requires-python = ">=3.9,<3.14"
+requires-python = ">=3.10,<4.0"
 authors = [
     { name = "Thib Guicherd-Callin",  email = "thib@cs.stanford.edu" },
 ]
@@ -40,10 +40,11 @@ maintainers = [
     { name = "Thib Guicherd-Callin",  email = "thib@cs.stanford.edu" }
 ]
 dependencies = [
-    "lockss-pybasic (>=0.1.0,<0.2.0)",
+    "click-extra (>=7.5.0,<7.6.0)",
+    "lockss-pybasic (==0.2.0-dev10)",
     "pydantic (>=2.11.0,<2.12.0)",
     "pydantic-argparse (>=0.10.0,<0.11.0)",
-    "tabulate (>=0.9.0,<0.10.0)"
+    "tabulate (>=0.9.0,<0.10.0)",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
