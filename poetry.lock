@@ -298,14 +298,14 @@ all = ["flake8 (>=7.1.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2
 
 [[package]]
 name = "lockss-pybasic"
-version = "0.2.0.dev11"
+version = "0.2.0.dev13"
 description = "Basic Python utilities"
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "lockss_pybasic-0.2.0.dev11-py3-none-any.whl", hash = "sha256:1d9803f4c9cb1e6c6a2275570099ed95a15faaddae72725ca6b4c89fc36cf19b"},
-    {file = "lockss_pybasic-0.2.0.dev11.tar.gz", hash = "sha256:bbe2100283369da1878680b6bb379f666e375a7700265874ba930e9504a8938d"},
+    {file = "lockss_pybasic-0.2.0.dev13-py3-none-any.whl", hash = "sha256:f891380b97ad0eda3a4ac460f654598dd2dd10d4515d1d394dc8e2c128615e97"},
+    {file = "lockss_pybasic-0.2.0.dev13.tar.gz", hash = "sha256:3e0b2b075b35fa1ebca75c6c3b86ae16b2bddb3964c0fa0c230b355c079a4ec5"},
 ]
 
 [package.dependencies]
@@ -457,17 +457,17 @@ bracex = ">=2.1.1"
 
 [[package]]
 name = "wcwidth"
-version = "0.5.3"
+version = "0.6.0"
 description = "Measures the displayed width of unicode strings in a terminal"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "wcwidth-0.5.3-py3-none-any.whl", hash = "sha256:d584eff31cd4753e1e5ff6c12e1edfdb324c995713f75d26c29807bb84bf649e"},
-    {file = "wcwidth-0.5.3.tar.gz", hash = "sha256:53123b7af053c74e9fe2e92ac810301f6139e64379031f7124574212fb3b4091"},
+    {file = "wcwidth-0.6.0-py3-none-any.whl", hash = "sha256:1a3a1e510b553315f8e146c54764f4fb6264ffad731b3d78088cdb1478ffbdad"},
+    {file = "wcwidth-0.6.0.tar.gz", hash = "sha256:cdc4e4262d6ef9a1a57e018384cbeb1208d8abbc64176027e2c2455c81313159"},
 ]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "30e555705422aa3f50d626638682e3e2a51ea01e198e21ddc3cfe668715ab75a"
+content-hash = "3c44cb3b5fad2cc6ad6f330e0f70f1e38c94017e18f899b7881ad3cc3740a9cb"
