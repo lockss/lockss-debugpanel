@@ -39,7 +39,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Optional
 
-from click_extra import ChoiceSource, EnumChoice, ExtraContext, IntRange, color_option, group, option, option_group, pass_context, password_option, progressbar, show_params_option, table_format_option
+from click_extra import ChoiceSource, EnumChoice, ExtraContext, IntRange, color_option, echo, group, option, option_group, pass_context, pass_obj, password_option, progressbar, show_params_option, table_format_option
 from cloup.constraints import mutually_exclusive
 
 from lockss.pybasic.cliutil import click_path, compose_decorators, make_extra_context_settings
@@ -63,17 +63,17 @@ _DEFAULT_JOB_POOL_TYPE: _JobPoolType = _JobPoolType.THREAD_POOL
 
 class _DebugPanelCli(object):
 
-    def __init__(self):
+    def __init__(self, ctx: ExtraContext):
         super().__init__()
         self._auids: Optional[list[str]] = None
         self._auth: Optional[tuple[str, str]] = None
-        self._ctx: Optional[ExtraContext] = None
+        self._ctx: ExtraContext = ctx
         self._executor: Optional[Executor] = None
         self._nodes: Optional[list[str]] = None
 
-    def _do_auid_command(self,
-                         node_auid_func: Callable[[Node, str], RequestUrlOpenT],
-                         **kwargs: dict[str, Any]) -> None:
+    def do_auid_command(self,
+                        node_auid_func: Callable[[Node, str], RequestUrlOpenT],
+                        **kwargs: dict[str, Any]) -> None:
         """
         Performs one AUID-centric command.
 
@@ -100,9 +100,9 @@ class _DebugPanelCli(object):
         self._ctx.print_table([[auid, *[results[(node, auid)] for node in self._nodes]] for auid in self._auids],
                               ['AUID', *self._nodes])
 
-    def _do_node_command(self,
-                         node_func: Callable[[Node], RequestUrlOpenT],
-                         **kwargs: dict[str, Any]) -> None:
+    def do_node_command(self,
+                        node_func: Callable[[Node], RequestUrlOpenT],
+                        **kwargs: dict[str, Any]) -> None:
         """
         Performs one node-centric command.
 
@@ -128,46 +128,40 @@ class _DebugPanelCli(object):
         self._ctx.print_table([[node, results[node]] for node in self._nodes],
                               ['Node', 'Result'])
 
-    def _initialize_auid_operation(self,
-                                   cli_ctx: ExtraContext,
-                                   cli_node: tuple[str, ...],
-                                   cli_nodes: tuple[Path, ...],
-                                   cli_username: str,
-                                   cli_password: str,
-                                   cli_auid: tuple[str, ...],
-                                   cli_auids: tuple[Path, ...],
-                                   cli_pool_size: Optional[int],
-                                   cli_pool_type: _JobPoolType,
-                                   cli_process_pool: bool,
-                                   cli_thread_pool: bool) -> None:
-        self._ctx = self._ctx or cli_ctx
-        self._initialize_node_operation(cli_ctx,
-                                        cli_node,
-                                        cli_nodes,
-                                        cli_username,
-                                        cli_password,
-                                        cli_pool_size,
-                                        cli_pool_type,
-                                        cli_process_pool,
-                                        cli_thread_pool)
+    def initialize_auid_operation(self,
+                                  cli_node: tuple[str, ...],
+                                  cli_nodes: tuple[Path, ...],
+                                  cli_username: str,
+                                  cli_password: str,
+                                  cli_auid: tuple[str, ...],
+                                  cli_auids: tuple[Path, ...],
+                                  cli_pool_size: Optional[int],
+                                  cli_pool_type: _JobPoolType,
+                                  cli_process_pool: bool,
+                                  cli_thread_pool: bool) -> None:
+        self.initialize_node_operation(cli_node,
+                                       cli_nodes,
+                                       cli_username,
+                                       cli_password,
+                                       cli_pool_size,
+                                       cli_pool_type,
+                                       cli_process_pool,
+                                       cli_thread_pool)
         self._auids = [*cli_auid, *chain.from_iterable(file_lines(file_path) for file_path in cli_auids)]
         if len(self._auids) == 0:
-            raise ValueError('The list of AUIDs to process is empty')
+            self._ctx.fail('The list of AUIDs to process is empty')
 
-    def _initialize_node_operation(self,
-                                   cli_ctx: ExtraContext,
-                                   cli_node: tuple[str, ...],
-                                   cli_nodes: tuple[Path, ...],
-                                   cli_username: str,
-                                   cli_password: str,
-                                   cli_pool_size: Optional[int],
-                                   cli_pool_type: _JobPoolType,
-                                   cli_process_pool: bool,
-                                   cli_thread_pool: bool) -> None:
-        self._ctx = self._ctx or cli_ctx
+    def initialize_node_operation(self, cli_node: tuple[str, ...],
+                                  cli_nodes: tuple[Path, ...],
+                                  cli_username: str,
+                                  cli_password: str,
+                                  cli_pool_size: Optional[int],
+                                  cli_pool_type: _JobPoolType,
+                                  cli_process_pool: bool,
+                                  cli_thread_pool: bool) -> None:
         self._nodes = [*cli_node, *chain.from_iterable(file_lines(file_path) for file_path in cli_nodes)]
         if len(self._nodes) == 0:
-            raise ValueError('The list of nodes to process is empty')
+            self._ctx.fail('The list of nodes to process is empty')
         self._auth = (cli_username, cli_password)
         if cli_process_pool:
             cli_pool_type = _JobPoolType.PROCESS_POOL
@@ -212,59 +206,51 @@ _pool_options = option_group(
 _table_format_option = table_format_option(help='Set the rendering of tables to the given style.')
 
 
-_node_operation = compose_decorators(_node_options, _pool_options, table_format_option, pass_context)
+_node_operation = compose_decorators(_node_options, pass_obj)
 
 
 _node_args = ['node', 'nodes', 'username', 'password', 'pool_size', 'pool_type', 'process_pool', 'thread_pool']
 
 
-_auid_operation = compose_decorators(_node_options, _auid_options, _pool_options, table_format_option, pass_context)
+_auid_operation = compose_decorators(_node_options, _auid_options, pass_obj)
 
 
 _auid_args = ['node', 'nodes', 'username', 'password', 'auid', 'auids', 'pool_size', 'pool_type', 'process_pool', 'thread_pool']
 
 
 @group('debugpanel', params=None, context_settings=make_extra_context_settings())
-@color_option
+@_pool_options
+@option_group('Output options', color_option, table_format_option)
 @show_params_option
 @pass_context
 def _debugpanel(ctx: ExtraContext, **kwargs):
-    ctx.obj = _DebugPanelCli()
+    ctx.obj = _DebugPanelCli(ctx)
 
 
 @_debugpanel.command('check-substance', aliases=['cs'], help='Cause nodes to check the substance of AUs.')
 @_auid_operation
-def _check_substance(ctx: ExtraContext, **kwargs) -> None:
-    try:
-        ctx.obj._initialize_auid_operation(ctx, *[kwargs.get(k) for k in _auid_args])
-    except ValueError as ve:
-        ctx.fail(str(ve))
-    ctx.obj._do_auid_command(check_substance)
+def _check_substance(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
+    cli.do_auid_command(check_substance)
 
 
 @_debugpanel.command('copyright', help='Show the copyright then exit.')
 def _copyright() -> None:
-    print(__copyright__)
+    echo(__copyright__)
 
 
 @_debugpanel.command('crawl', aliases=['cr'], help='Cause nodes to crawl AUs.')
 @_auid_operation
-def _crawl(ctx: ExtraContext, **kwargs) -> None:
-    try:
-        ctx.obj._initialize_auid_operation(ctx, *[kwargs.get(k) for k in _auid_args])
-    except ValueError as ve:
-        ctx.fail(str(ve))
-    ctx.obj._do_auid_command(crawl)
+def _crawl(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
+    cli.do_auid_command(crawl)
 
 
 @_debugpanel.command('crawl-plugins', aliases=['cp'], help='Cause nodes to crawl plugins.')
 @_node_operation
-def _crawl_plugins(ctx: ExtraContext, **kwargs) -> None:
-    try:
-        ctx.obj._initialize_node_operation(ctx, *[kwargs.get(k) for k in _node_args])
-    except ValueError as ve:
-        ctx.fail(str(ve))
-    ctx.obj._do_node_command(crawl_plugins)
+def _crawl_plugins(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_node_operation(*[kwargs.get(k) for k in _node_args])
+    cli.do_node_command(crawl_plugins)
 
 
 @_debugpanel.command('deep-crawl', aliases=['dc'], help='Cause nodes to deep-crawl AUs.')
@@ -272,74 +258,56 @@ def _crawl_plugins(ctx: ExtraContext, **kwargs) -> None:
     _node_options, _auid_options,
     option_group('Depth options',
                  option('--depth', '-d', metavar='DEPTH', type=IntRange(1, None), default=DEFAULT_DEPTH, help='Set the crawl depth to DEPTH.')),
-    _pool_options, table_format_option, pass_context
+    _pool_options, table_format_option, pass_obj
 )
-def _deep_crawl(ctx: ExtraContext, **kwargs) -> None:
-    try:
-        ctx.obj._initialize_auid_operation(ctx, *[kwargs.get(k) for k in _auid_args])
-    except ValueError as ve:
-        ctx.fail(str(ve))
-    ctx.obj._do_auid_command(deep_crawl, depth=kwargs.get('depth'))
+def _deep_crawl(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
+    cli.do_auid_command(deep_crawl, depth=kwargs.get('depth'))
 
 
 @_debugpanel.command('disable-indexing', aliases=['di'], help='Cause nodes to disable metadata indexing for AUs.')
 @_auid_operation
-def _disable_indexing(ctx: ExtraContext, **kwargs) -> None:
-    try:
-        ctx.obj._initialize_auid_operation(ctx, *[kwargs.get(k) for k in _auid_args])
-    except ValueError as ve:
-        ctx.fail(str(ve))
-    ctx.obj._do_auid_command(disable_indexing)
+def _disable_indexing(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
+    cli.do_auid_command(disable_indexing)
 
 
 @_debugpanel.command('license', help='Show the software license then exit.')
 def license() -> None:
-    print(__license__)
+    echo(__license__)
 
 
 @_debugpanel.command('poll', aliases=['po'], help='Cause nodes to poll AUs.')
 @_auid_operation
-def _poll(ctx: ExtraContext, **kwargs) -> None:
-    try:
-        ctx.obj._initialize_auid_operation(ctx, *[kwargs.get(k) for k in _auid_args])
-    except ValueError as ve:
-        ctx.fail(str(ve))
-    ctx.obj._do_auid_command(poll)
+def _poll(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
+    cli.do_auid_command(poll)
 
 
 @_debugpanel.command('reindex-metadata', aliases=['ri'], help='Cause nodes to reindex the metadata of AUs.')
 @_auid_operation
-def _reindex_metadata(ctx: ExtraContext, **kwargs) -> None:
-    try:
-        ctx.obj._initialize_auid_operation(ctx, *[kwargs.get(k) for k in _auid_args])
-    except ValueError as ve:
-        ctx.fail(str(ve))
-    ctx.obj._do_auid_command(reindex_metadata)
+def _reindex_metadata(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
+    cli.do_auid_command(reindex_metadata)
 
 
 @_debugpanel.command('reload-config', aliases=['rc'], help='Cause nodes to reload their configuration.')
 @_node_operation
-def _reload_config(ctx: ExtraContext, **kwargs) -> None:
-    try:
-        ctx.obj._initialize_node_operation(ctx, *[kwargs.get(k) for k in _node_args])
-    except ValueError as ve:
-        ctx.fail(str(ve))
-    ctx.obj._do_node_command(reload_config)
+def _reload_config(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_node_operation(*[kwargs.get(k) for k in _node_args])
+    cli.do_node_command(reload_config)
 
 
 @_debugpanel.command('validate-files', aliases=['vf'], help='Cause nodes to validate the files of AUs.')
 @_auid_operation
-def _validate_files(ctx: ExtraContext, **kwargs) -> None:
-    try:
-        ctx.obj._initialize_auid_operation(ctx, *[kwargs.get(k) for k in _auid_args])
-    except ValueError as ve:
-        ctx.fail(str(ve))
-    ctx.obj._do_auid_command(validate_files)
+def _validate_files(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
+    cli.do_auid_command(validate_files)
 
 
 @_debugpanel.command('version', help='Show the version number then exit.')
 def version() -> None:
-    print(__version__)
+    echo(__version__)
 
 
 def main() -> None:

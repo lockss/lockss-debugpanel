@@ -4,7 +4,7 @@
 Library and command line tool to interact with the LOCKSS 1.x DebugPanel servlet.
 """
 
-__version__ = '0.9.0-dev4'
+__version__ = '0.9.0-dev5'
 
 __copyright__ = '''
 Copyright (c) 2000-2025, Board of Trustees of Leland Stanford Jr. University

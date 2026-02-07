@@ -28,7 +28,7 @@
 
 [project]
 name = "lockss-debugpanel"
-version = "0.9.0-dev4" # Always change in __init__.py, and at release time in README.rst and CHANGELOG.rst
+version = "0.9.0-dev5" # Always change in __init__.py, and at release time in README.rst and CHANGELOG.rst
 description = "Command line tool and Python library to interact with the LOCKSS 1.x DebugPanel servlet"
 license = { text = "BSD-3-Clause" }
 readme = "README.rst"
