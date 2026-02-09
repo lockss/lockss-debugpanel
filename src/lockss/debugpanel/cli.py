@@ -39,12 +39,12 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Optional
 
-from click_extra import ChoiceSource, EnumChoice, ExtraContext, IntRange, color_option, echo, group, option, option_group, pass_context, pass_obj, password_option, progressbar, show_params_option, table_format_option
+from click_extra import ChoiceSource, EnumChoice, ExtraContext, IntRange, color_option, echo, group, option, option_group, pass_context, pass_obj, password_option, print_table, progressbar, prompt, show_params_option, table_format_option
 from cloup.constraints import mutually_exclusive
 
 from lockss.pybasic.cliutil import click_path, compose_decorators, make_extra_context_settings
 from lockss.pybasic.errorutil import InternalError
-from lockss.pybasic.fileutil import file_lines, path
+from lockss.pybasic.fileutil import file_lines
 from . import Node, RequestUrlOpenT, check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reload_config, reindex_metadata, validate_files, DEFAULT_DEPTH, __copyright__, __license__, __version__
 
 
@@ -70,6 +70,7 @@ class _DebugPanelCli(object):
         self._ctx: ExtraContext = ctx
         self._executor: Optional[Executor] = None
         self._nodes: Optional[list[str]] = None
+        self._table_format: Optional[str] = None
 
     def do_auid_command(self,
                         node_auid_func: Callable[[Node, str], RequestUrlOpenT],
@@ -96,9 +97,12 @@ class _DebugPanelCli(object):
                         reason: str = resp.reason
                         results[node_auid] = 'Requested' if status == 200 else reason
                     except Exception as exc:
+                        import traceback
+                        traceback.print_exception(exc)
                         results[node_auid] = exc
-        self._ctx.print_table([[auid, *[results[(node, auid)] for node in self._nodes]] for auid in self._auids],
-                              ['AUID', *self._nodes])
+        print_table([[auid, *[results[(node, auid)] for node in self._nodes]] for auid in self._auids],
+                    ['AUID', *self._nodes],
+                    table_format=self._table_format)
 
     def do_node_command(self,
                         node_func: Callable[[Node], RequestUrlOpenT],
@@ -125,8 +129,9 @@ class _DebugPanelCli(object):
                         results[node] = 'Requested' if status == 200 else reason
                     except Exception as exc:
                         results[node] = exc
-        self._ctx.print_table([[node, results[node]] for node in self._nodes],
-                              ['Node', 'Result'])
+        print_table([[node, results[node]] for node in self._nodes],
+                    ['Node', 'Result'],
+                    table_format=self._table_format)
 
     def initialize_auid_operation(self,
                                   cli_node: tuple[str, ...],
@@ -137,36 +142,30 @@ class _DebugPanelCli(object):
                                   cli_auids: tuple[Path, ...],
                                   cli_pool_size: Optional[int],
                                   cli_pool_type: _JobPoolType,
-                                  cli_process_pool: bool,
-                                  cli_thread_pool: bool) -> None:
+                                  cli_table_format: str) -> None:
         self.initialize_node_operation(cli_node,
                                        cli_nodes,
                                        cli_username,
                                        cli_password,
                                        cli_pool_size,
                                        cli_pool_type,
-                                       cli_process_pool,
-                                       cli_thread_pool)
+                                       cli_table_format)
         self._auids = [*cli_auid, *chain.from_iterable(file_lines(file_path) for file_path in cli_auids)]
         if len(self._auids) == 0:
             self._ctx.fail('The list of AUIDs to process is empty')
 
-    def initialize_node_operation(self, cli_node: tuple[str, ...],
+    def initialize_node_operation(self,
+                                  cli_node: tuple[str, ...],
                                   cli_nodes: tuple[Path, ...],
                                   cli_username: str,
                                   cli_password: str,
                                   cli_pool_size: Optional[int],
                                   cli_pool_type: _JobPoolType,
-                                  cli_process_pool: bool,
-                                  cli_thread_pool: bool) -> None:
+                                  cli_table_format: str) -> None:
         self._nodes = [*cli_node, *chain.from_iterable(file_lines(file_path) for file_path in cli_nodes)]
         if len(self._nodes) == 0:
             self._ctx.fail('The list of nodes to process is empty')
         self._auth = (cli_username, cli_password)
-        if cli_process_pool:
-            cli_pool_type = _JobPoolType.PROCESS_POOL
-        elif cli_thread_pool:
-            cli_pool_type = _JobPoolType.THREAD_POOL
         match cli_pool_type:
             case _JobPoolType.PROCESS_POOL:
                 self._executor = ProcessPoolExecutor(max_workers=cli_pool_size)
@@ -174,14 +173,23 @@ class _DebugPanelCli(object):
                 self._executor = ThreadPoolExecutor(max_workers=cli_pool_size)
             case _:
                 raise InternalError() from ValueError(cli_pool_type)
+        self._table_format = cli_table_format
 
 
 _node_options = option_group(
     'Node options',
     option('--node', '-n', metavar='NODE', multiple=True, help='Add NODE to the list of nodes to process.'),
     option('--nodes', '-N', metavar='FILE', type=click_path('ferz'), multiple=True, help='Add the nodes in FILE to the list of nodes to process.'),
-    option('--username', '-u', metavar='USER', show_default='interactive prompt', help='Set the UI username to USER.', prompt='UI username'),
-    password_option('--password', '-p', metavar='PASS', show_default='interactive prompt', help='Set the UI password to PASS.', prompt='UI password', confirmation_prompt=False)
+    mutually_exclusive(
+        # option('--username', '-U', metavar='USER', show_default='interactive prompt', help='Set the UI username to USER.', prompt='UI username'),
+        option('--username', '-U', metavar='USER', show_default='interactive prompt', help='Set the UI username to USER.'),
+        option('-u', metavar='USER', deprecated='Use -U instead.')
+    ),
+    mutually_exclusive(
+        # password_option('--password', '-P', metavar='PASS', show_default='interactive prompt', help='Set the UI password to PASS.', prompt='UI password', confirmation_prompt=False),
+        option('--password', '-P', metavar='PASS', show_default='interactive prompt', help='Set the UI password to PASS.'),
+        option('-p', metavar='PASS', deprecated='Use -P instead.')
+    )
 )
 
 
@@ -196,31 +204,59 @@ _pool_options = option_group(
     'Job pool options',
     option('--pool-size', metavar='SIZE', type=Optional[IntRange(1, None)], default=None, help='Set the job pool size to SIZE.', show_default='CPU-dependent'),
     mutually_exclusive(
-        option('--pool-type', type=EnumChoice(choices=_JobPoolType, choice_source=ChoiceSource.VALUE), default=_DEFAULT_JOB_POOL_TYPE, help=f'Set the job pool type to the given type.'),
+        # option('--pool-type', type=EnumChoice(choices=_JobPoolType, choice_source=ChoiceSource.VALUE), default=_DEFAULT_JOB_POOL_TYPE, help=f'Set the job pool type to the given type.'),
+        option('--pool-type', type=EnumChoice(choices=_JobPoolType, choice_source=ChoiceSource.VALUE), show_default=_DEFAULT_JOB_POOL_TYPE, help=f'Set the job pool type to the given type.'),
         option('--process-pool', is_flag=True, deprecated='Use --pool-type=process-pool instead.'),
         option('--thread-pool', is_flag=True, deprecated='Use --pool-type=thread-pool instead.')
     )
 )
 
 
-_table_format_option = table_format_option(help='Set the rendering of tables to the given style.')
+_output_options = option_group(
+    'Output options',
+    table_format_option(help='Set the rendering of tables to the given style.')
+)
 
 
-_node_operation = compose_decorators(_node_options, pass_obj)
+_node_operation = compose_decorators(_node_options, _pool_options, _output_options, pass_obj)
 
 
-_node_args = ['node', 'nodes', 'username', 'password', 'pool_size', 'pool_type', 'process_pool', 'thread_pool']
+_node_args = ['node', 'nodes', 'username', 'password', 'pool_size', 'pool_type', 'table_format']
 
 
-_auid_operation = compose_decorators(_node_options, _auid_options, pass_obj)
+_auid_operation = compose_decorators(_node_options, _auid_options, _pool_options, _output_options, pass_obj)
 
 
-_auid_args = ['node', 'nodes', 'username', 'password', 'auid', 'auids', 'pool_size', 'pool_type', 'process_pool', 'thread_pool']
+_auid_args = ['node', 'nodes', 'username', 'password', 'auid', 'auids', 'pool_size', 'pool_type', 'table_format']
+
+
+def _fix_deprecated(old_kwargs: dict[str, Any]) -> dict[str, Any]:
+    print('FIXME', old_kwargs)
+    ret = old_kwargs.copy()
+    OLD_VAL = object()
+    # -u -> --username/-U ; -p -> --password/-P
+    for old_key, new_key, new_val in (# -u -> --username/-U
+                                      ('u', 'username', OLD_VAL),
+                                      # -p -> --password/-P
+                                      ('p', 'password', OLD_VAL),
+                                      # --thread-pool -> --pool-type=thread-pool
+                                      ('thread_pool', 'pool_type', _JobPoolType.THREAD_POOL),
+                                      # --process-pool -> --pool-type=process-pool
+                                      ('process_pool', 'pool_type', _JobPoolType.PROCESS_POOL)):
+        if old_key in ret:
+            ret[new_key] = ret[old_key] if new_val == OLD_VAL else new_val
+    if not ret.get('username'):
+        ret['username'] = prompt('UI username')
+    if not ret.get('password'):
+        ret['password'] = prompt('UI password', hide_input=True, confirmation_prompt=False)
+    if not ret.get('pool_type'):
+        ret['pool_type'] = _DEFAULT_JOB_POOL_TYPE
+    print('FIXME', ret)
+    return ret
 
 
 @group('debugpanel', params=None, context_settings=make_extra_context_settings())
-@_pool_options
-@option_group('Output options', color_option, table_format_option)
+@color_option
 @show_params_option
 @pass_context
 def _debugpanel(ctx: ExtraContext, **kwargs):
@@ -230,6 +266,7 @@ def _debugpanel(ctx: ExtraContext, **kwargs):
 @_debugpanel.command('check-substance', aliases=['cs'], help='Cause nodes to check the substance of AUs.')
 @_auid_operation
 def _check_substance(cli: _DebugPanelCli, **kwargs) -> None:
+    kwargs = _fix_deprecated(kwargs)
     cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
     cli.do_auid_command(check_substance)
 
@@ -242,6 +279,7 @@ def _copyright() -> None:
 @_debugpanel.command('crawl', aliases=['cr'], help='Cause nodes to crawl AUs.')
 @_auid_operation
 def _crawl(cli: _DebugPanelCli, **kwargs) -> None:
+    kwargs = _fix_deprecated(kwargs)
     cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
     cli.do_auid_command(crawl)
 
@@ -249,6 +287,7 @@ def _crawl(cli: _DebugPanelCli, **kwargs) -> None:
 @_debugpanel.command('crawl-plugins', aliases=['cp'], help='Cause nodes to crawl plugins.')
 @_node_operation
 def _crawl_plugins(cli: _DebugPanelCli, **kwargs) -> None:
+    kwargs = _fix_deprecated(kwargs)
     cli.initialize_node_operation(*[kwargs.get(k) for k in _node_args])
     cli.do_node_command(crawl_plugins)
 
@@ -261,6 +300,7 @@ def _crawl_plugins(cli: _DebugPanelCli, **kwargs) -> None:
     _pool_options, table_format_option, pass_obj
 )
 def _deep_crawl(cli: _DebugPanelCli, **kwargs) -> None:
+    kwargs = _fix_deprecated(kwargs)
     cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
     cli.do_auid_command(deep_crawl, depth=kwargs.get('depth'))
 
@@ -268,6 +308,7 @@ def _deep_crawl(cli: _DebugPanelCli, **kwargs) -> None:
 @_debugpanel.command('disable-indexing', aliases=['di'], help='Cause nodes to disable metadata indexing for AUs.')
 @_auid_operation
 def _disable_indexing(cli: _DebugPanelCli, **kwargs) -> None:
+    kwargs = _fix_deprecated(kwargs)
     cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
     cli.do_auid_command(disable_indexing)
 
@@ -280,6 +321,7 @@ def license() -> None:
 @_debugpanel.command('poll', aliases=['po'], help='Cause nodes to poll AUs.')
 @_auid_operation
 def _poll(cli: _DebugPanelCli, **kwargs) -> None:
+    kwargs = _fix_deprecated(kwargs)
     cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
     cli.do_auid_command(poll)
 
@@ -287,6 +329,7 @@ def _poll(cli: _DebugPanelCli, **kwargs) -> None:
 @_debugpanel.command('reindex-metadata', aliases=['ri'], help='Cause nodes to reindex the metadata of AUs.')
 @_auid_operation
 def _reindex_metadata(cli: _DebugPanelCli, **kwargs) -> None:
+    kwargs = _fix_deprecated(kwargs)
     cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
     cli.do_auid_command(reindex_metadata)
 
@@ -294,6 +337,7 @@ def _reindex_metadata(cli: _DebugPanelCli, **kwargs) -> None:
 @_debugpanel.command('reload-config', aliases=['rc'], help='Cause nodes to reload their configuration.')
 @_node_operation
 def _reload_config(cli: _DebugPanelCli, **kwargs) -> None:
+    kwargs = _fix_deprecated(kwargs)
     cli.initialize_node_operation(*[kwargs.get(k) for k in _node_args])
     cli.do_node_command(reload_config)
 
@@ -301,6 +345,7 @@ def _reload_config(cli: _DebugPanelCli, **kwargs) -> None:
 @_debugpanel.command('validate-files', aliases=['vf'], help='Cause nodes to validate the files of AUs.')
 @_auid_operation
 def _validate_files(cli: _DebugPanelCli, **kwargs) -> None:
+    kwargs = _fix_deprecated(kwargs)
     cli.initialize_auid_operation(*[kwargs.get(k) for k in _auid_args])
     cli.do_auid_command(validate_files)
 
