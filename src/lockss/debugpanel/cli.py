@@ -90,16 +90,14 @@ class _DebugPanelCli(object):
         results: dict[tuple[str, str], Any] = {}
         with progressbar(as_completed(futures), length=len(futures), label='Progress') as bar:
             for future in bar:
-                with future.result() as resp:
-                    node_auid = futures[future]
-                    try:
+                node_auid = futures[future]
+                try:
+                    with future.result() as resp:
                         status: int = resp.status
                         reason: str = resp.reason
                         results[node_auid] = 'Requested' if status == 200 else reason
-                    except Exception as exc:
-                        import traceback
-                        traceback.print_exception(exc)
-                        results[node_auid] = exc
+                except Exception as exc:
+                    results[node_auid] = exc
         print_table([[auid, *[results[(node, auid)] for node in self._nodes]] for auid in self._auids],
                     ['AUID', *self._nodes],
                     table_format=self._table_format)
@@ -121,14 +119,14 @@ class _DebugPanelCli(object):
         results: dict[str, Any] = {}
         with progressbar(as_completed(futures), length=len(futures), label='Progress') as bar:
             for future in bar:
-                with future.result() as resp:
-                    node = futures[future]
-                    try:
+                node = futures[future]
+                try:
+                    with future.result() as resp:
                         status: int = resp.status
                         reason: str = resp.reason
                         results[node] = 'Requested' if status == 200 else reason
-                    except Exception as exc:
-                        results[node] = exc
+                except Exception as exc:
+                    results[node] = exc
         print_table([[node, results[node]] for node in self._nodes],
                     ['Node', 'Result'],
                     table_format=self._table_format)
@@ -231,10 +229,8 @@ _auid_args = ['node', 'nodes', 'username', 'password', 'auid', 'auids', 'pool_si
 
 
 def _fix_deprecated(old_kwargs: dict[str, Any]) -> dict[str, Any]:
-    print('FIXME', old_kwargs)
     ret = old_kwargs.copy()
     OLD_VAL = object()
-    # -u -> --username/-U ; -p -> --password/-P
     for old_key, new_key, new_val in (# -u -> --username/-U
                                       ('u', 'username', OLD_VAL),
                                       # -p -> --password/-P
@@ -243,7 +239,7 @@ def _fix_deprecated(old_kwargs: dict[str, Any]) -> dict[str, Any]:
                                       ('thread_pool', 'pool_type', _JobPoolType.THREAD_POOL),
                                       # --process-pool -> --pool-type=process-pool
                                       ('process_pool', 'pool_type', _JobPoolType.PROCESS_POOL)):
-        if old_key in ret:
+        if ret.get(old_key):
             ret[new_key] = ret[old_key] if new_val == OLD_VAL else new_val
     if not ret.get('username'):
         ret['username'] = prompt('UI username')
@@ -251,7 +247,6 @@ def _fix_deprecated(old_kwargs: dict[str, Any]) -> dict[str, Any]:
         ret['password'] = prompt('UI password', hide_input=True, confirmation_prompt=False)
     if not ret.get('pool_type'):
         ret['pool_type'] = _DEFAULT_JOB_POOL_TYPE
-    print('FIXME', ret)
     return ret
 
 
