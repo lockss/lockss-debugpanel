@@ -41,7 +41,7 @@ maintainers = [
 ]
 dependencies = [
     "click-extra (>=7.5.0,<7.6.0)",
-    "lockss-pybasic (==0.2.0-dev13)",
+    "lockss-pybasic (==0.2.0-dev14)",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",

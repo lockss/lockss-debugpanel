@@ -39,10 +39,10 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Optional
 
-from click_extra import ChoiceSource, EnumChoice, ExtraContext, IntRange, color_option, echo, group, option, option_group, pass_context, pass_obj, password_option, print_table, progressbar, prompt, show_params_option, table_format_option
+from click_extra import ChoiceSource, EnumChoice, ExtraContext, color_option, echo, group, option, option_group, pass_context, pass_obj, password_option, print_table, progressbar, prompt, show_params_option, table_format_option
 from cloup.constraints import mutually_exclusive
 
-from lockss.pybasic.cliutil import click_path, compose_decorators, make_extra_context_settings
+from lockss.pybasic.cliutil import NonNegativeInt, click_path, compose_decorators, make_extra_context_settings
 from lockss.pybasic.errorutil import InternalError
 from lockss.pybasic.fileutil import file_lines
 from . import Node, RequestUrlOpenT, check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reload_config, reindex_metadata, validate_files, DEFAULT_DEPTH, __copyright__, __license__, __version__
@@ -200,7 +200,7 @@ _auid_options = option_group(
 
 _pool_options = option_group(
     'Job pool options',
-    option('--pool-size', metavar='SIZE', type=Optional[IntRange(1, None)], default=None, help='Set the job pool size to SIZE.', show_default='CPU-dependent'),
+    option('--pool-size', metavar='SIZE', type=Optional[NonNegativeInt], default=None, help='Set the job pool size to SIZE.', show_default='CPU-dependent'),
     mutually_exclusive(
         # option('--pool-type', type=EnumChoice(choices=_JobPoolType, choice_source=ChoiceSource.VALUE), default=_DEFAULT_JOB_POOL_TYPE, help=f'Set the job pool type to the given type.'),
         option('--pool-type', type=EnumChoice(choices=_JobPoolType, choice_source=ChoiceSource.VALUE), show_default=_DEFAULT_JOB_POOL_TYPE, help=f'Set the job pool type to the given type.'),
@@ -219,13 +219,13 @@ _output_options = option_group(
 _node_operation = compose_decorators(_node_options, _pool_options, _output_options, pass_obj)
 
 
-_node_args = ['node', 'nodes', 'username', 'password', 'pool_size', 'pool_type', 'table_format']
+_node_args = ('node', 'nodes', 'username', 'password', 'pool_size', 'pool_type', 'table_format')
 
 
 _auid_operation = compose_decorators(_node_options, _auid_options, _pool_options, _output_options, pass_obj)
 
 
-_auid_args = ['node', 'nodes', 'username', 'password', 'auid', 'auids', 'pool_size', 'pool_type', 'table_format']
+_auid_args = ('node', 'nodes', 'username', 'password', 'auid', 'auids', 'pool_size', 'pool_type', 'table_format')
 
 
 def _fix_deprecated(old_kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -291,7 +291,7 @@ def _crawl_plugins(cli: _DebugPanelCli, **kwargs) -> None:
 @compose_decorators(
     _node_options, _auid_options,
     option_group('Depth options',
-                 option('--depth', '-d', metavar='DEPTH', type=IntRange(1, None), default=DEFAULT_DEPTH, help='Set the crawl depth to DEPTH.')),
+                 option('--depth', '-d', metavar='DEPTH', type=NonNegativeInt, default=DEFAULT_DEPTH, help='Set the crawl depth to DEPTH.')),
     _pool_options, table_format_option, pass_obj
 )
 def _deep_crawl(cli: _DebugPanelCli, **kwargs) -> None:
