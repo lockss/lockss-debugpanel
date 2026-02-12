@@ -40,7 +40,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Optional
 
-from click_extra import ChoiceSource, EnumChoice, ExtraContext, TableFormat, color_option, echo, group, option, option_group, pass_context, pass_obj, password_option, print_table, progressbar, prompt, show_params_option, table_format_option
+from click_extra import ChoiceSource, EnumChoice, ExtraContext, Section, TableFormat, color_option, echo, group, option, option_group, pass_context, pass_obj, password_option, print_table, progressbar, prompt, show_params_option, table_format_option
 from cloup.constraints import mutually_exclusive
 
 from lockss.pybasic.cliutil import NonNegativeInt, click_path, compose_decorators, make_extra_context_settings
@@ -250,33 +250,41 @@ def _debugpanel(ctx: ExtraContext, **kwargs):
     ctx.obj = _DebugPanelCli(ctx)
 
 
-@_debugpanel.command('check-substance', aliases=['cs'], help='Cause nodes to check the substance of AUs.')
-@_auid_operation
-def _check_substance(cli: _DebugPanelCli, **kwargs) -> None:
-    cli.initialize_opts(_Opts(**kwargs))
-    cli.do_auid_command(check_substance)
+_NODE_COMMANDS = Section('Node commands')
 
 
-@_debugpanel.command('copyright', help='Show the copyright then exit.')
-def _copyright() -> None:
-    echo(__copyright__)
-
-
-@_debugpanel.command('crawl', aliases=['cr'], help='Cause nodes to crawl AUs.')
-@_auid_operation
-def _crawl(cli: _DebugPanelCli, **kwargs) -> None:
-    cli.initialize_opts(_Opts(**kwargs))
-    cli.do_auid_command(crawl)
-
-
-@_debugpanel.command('crawl-plugins', aliases=['cp'], help='Cause nodes to crawl plugins.')
+@_debugpanel.command('crawl-plugins', aliases=['cp'], section=_NODE_COMMANDS, help='Cause nodes to crawl plugins.')
 @_node_operation
 def _crawl_plugins(cli: _DebugPanelCli, **kwargs) -> None:
     cli.initialize_opts(_Opts(**kwargs))
     cli.do_node_command(crawl_plugins)
 
 
-@_debugpanel.command('deep-crawl', aliases=['dc'], help='Cause nodes to deep-crawl AUs.')
+@_debugpanel.command('reload-config', aliases=['rc'], section=_NODE_COMMANDS, help='Cause nodes to reload their configuration.')
+@_node_operation
+def _reload_config(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_opts(_Opts(**kwargs))
+    cli.do_node_command(reload_config)
+
+
+_AUID_COMMANDS = Section('AUID commands')
+
+
+@_debugpanel.command('check-substance', aliases=['cs'], section=_AUID_COMMANDS, help='Cause nodes to check the substance of AUs.')
+@_auid_operation
+def _check_substance(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_opts(_Opts(**kwargs))
+    cli.do_auid_command(check_substance)
+
+
+@_debugpanel.command('crawl', aliases=['cr'], section=_AUID_COMMANDS, help='Cause nodes to crawl AUs.')
+@_auid_operation
+def _crawl(cli: _DebugPanelCli, **kwargs) -> None:
+    cli.initialize_opts(_Opts(**kwargs))
+    cli.do_auid_command(crawl)
+
+
+@_debugpanel.command('deep-crawl', aliases=['dc'], section=_AUID_COMMANDS, help='Cause nodes to deep-crawl AUs.')
 @compose_decorators(
     _node_option_group, _auid_option_group,
     option_group('Depth options',
@@ -288,44 +296,42 @@ def _deep_crawl(cli: _DebugPanelCli, **kwargs) -> None:
     cli.do_auid_command(deep_crawl, depth=kwargs.get('depth')) # FIXME?
 
 
-@_debugpanel.command('disable-indexing', aliases=['di'], help='Cause nodes to disable metadata indexing for AUs.')
+@_debugpanel.command('disable-indexing', aliases=['di'], section=_AUID_COMMANDS, help='Cause nodes to disable metadata indexing for AUs.')
 @_auid_operation
 def _disable_indexing(cli: _DebugPanelCli, **kwargs) -> None:
     cli.initialize_opts(_Opts(**kwargs))
     cli.do_auid_command(disable_indexing)
 
 
-@_debugpanel.command('license', help='Show the software license then exit.')
-def license() -> None:
-    echo(__license__)
-
-
-@_debugpanel.command('poll', aliases=['po'], help='Cause nodes to poll AUs.')
+@_debugpanel.command('poll', aliases=['po'], section=_AUID_COMMANDS, help='Cause nodes to poll AUs.')
 @_auid_operation
 def _poll(cli: _DebugPanelCli, **kwargs) -> None:
     cli.initialize_opts(_Opts(**kwargs))
     cli.do_auid_command(poll)
 
 
-@_debugpanel.command('reindex-metadata', aliases=['ri'], help='Cause nodes to reindex the metadata of AUs.')
+@_debugpanel.command('reindex-metadata', aliases=['ri'], section=_AUID_COMMANDS, help='Cause nodes to reindex the metadata of AUs.')
 @_auid_operation
 def _reindex_metadata(cli: _DebugPanelCli, **kwargs) -> None:
     cli.initialize_opts(_Opts(**kwargs))
     cli.do_auid_command(reindex_metadata)
 
 
-@_debugpanel.command('reload-config', aliases=['rc'], help='Cause nodes to reload their configuration.')
-@_node_operation
-def _reload_config(cli: _DebugPanelCli, **kwargs) -> None:
-    cli.initialize_opts(_Opts(**kwargs))
-    cli.do_node_command(reload_config)
-
-
-@_debugpanel.command('validate-files', aliases=['vf'], help='Cause nodes to validate the files of AUs.')
+@_debugpanel.command('validate-files', aliases=['vf'], section=_AUID_COMMANDS, help='Cause nodes to validate the files of AUs.')
 @_auid_operation
 def _validate_files(cli: _DebugPanelCli, **kwargs) -> None:
     cli.initialize_opts(_Opts(**kwargs))
     cli.do_auid_command(validate_files)
+
+
+@_debugpanel.command('copyright', help='Show the copyright then exit.')
+def _copyright() -> None:
+    echo(__copyright__)
+
+
+@_debugpanel.command('license', help='Show the software license then exit.')
+def license() -> None:
+    echo(__license__)
 
 
 @_debugpanel.command('version', help='Show the version number then exit.')
