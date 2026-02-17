@@ -121,7 +121,7 @@ class _DebugPanelCli(object):
         :param kwargs: Keyword arguments (needed for the ``depth`` command).
         :type kwargs: Dict[str, Any]
         """
-        self.initialize_auid_operation()
+        self._initialize_auid_operation()
         node_objects = [Node(node, *self._auth) for node in self._nodes]
         futures: dict[Future, tuple[str, str]] = {self._executor.submit(node_auid_func, node_object, auid, **kwargs): (node, auid) for auid in self._auids for node, node_object in zip(self._nodes, node_objects)}
         results: dict[tuple[str, str], Any] = {}
@@ -151,7 +151,7 @@ class _DebugPanelCli(object):
         :param kwargs: Keyword arguments (not currently needed by any command).
         :type kwargs: Dict[str, Any]
         """
-        self.initialize_node_operation()
+        self._initialize_node_operation()
         node_objects = [Node(node, *self._auth) for node in self._nodes]
         futures: dict[Future, str] = {self._executor.submit(node_func, node_object, **kwargs): node for node, node_object in zip(self._nodes, node_objects)}
         results: dict[str, Any] = {}
@@ -169,16 +169,17 @@ class _DebugPanelCli(object):
                     ['Node', 'Result'],
                     table_format=self._opts.table_format)
 
-    def initialize_auid_operation(self) -> None:
-        opts = self._opts
-        self.initialize_node_operation()
-        self._auids = [*opts.auid, *chain.from_iterable(file_lines(file_path) for file_path in opts.auids)]
+    def initialize_opts(self, opts: _Opts) -> None:
+        self._opts = opts
+
+    def _initialize_auid_operation(self) -> None:
+        self._initialize_node_operation()
+        self._auids = [*(opts := self._opts).auid, *chain.from_iterable(file_lines(file_path) for file_path in opts.auids)]
         if len(self._auids) == 0:
             self._ctx.fail('The list of AUIDs to process is empty')
 
-    def initialize_node_operation(self) -> None:
-        opts = self._opts
-        self._nodes = [*opts.node, *chain.from_iterable(file_lines(file_path) for file_path in opts.nodes)]
+    def _initialize_node_operation(self) -> None:
+        self._nodes = [*(opts := self._opts).node, *chain.from_iterable(file_lines(file_path) for file_path in opts.nodes)]
         if len(self._nodes) == 0:
             self._ctx.fail('The list of nodes to process is empty')
         self._auth = (opts.username, opts.password)
@@ -189,9 +190,6 @@ class _DebugPanelCli(object):
                 self._executor = ThreadPoolExecutor(max_workers=opts.pool_size)
             case _:
                 raise InternalError() from ValueError(opts.pool_type)
-
-    def initialize_opts(self, opts: _Opts) -> None:
-        self._opts = opts
 
 
 _node_option_group = option_group(
