@@ -176,35 +176,35 @@ colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
 name = "click-extra"
-version = "7.5.1"
+version = "7.5.3"
 description = "🌈 Drop-in replacement for Click to make user-friendly and colorful CLI"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "click_extra-7.5.1-py3-none-any.whl", hash = "sha256:0fadd72638174682c16f2de4480ca9e9d9b4a3b1c97653a718e4b0eb1d0a4ced"},
-    {file = "click_extra-7.5.1.tar.gz", hash = "sha256:df11522e33a3c5a7e9418d8b5b8882d92107c8ce7539fd0d7450b86f6ab7b7c5"},
+    {file = "click_extra-7.5.3-py3-none-any.whl", hash = "sha256:7007f5804b50aa26de4b2a8508ed779fabd7605620ab3b305395696a22fc73e9"},
+    {file = "click_extra-7.5.3.tar.gz", hash = "sha256:1aab4019e6857ea636f6da5e6befcb4b3739cdb13f248f0fa11b62bd2f4b553c"},
 ]
 
 [package.dependencies]
-boltons = ">=25.0.0"
+boltons = ">=25"
 click = ">=8.3.1"
 cloup = ">=3.0.7"
-deepmerge = ">=2.0"
-extra-platforms = ">=8.0.0"
+deepmerge = ">=2"
+extra-platforms = ">=8"
 requests = ">=2.32.5"
 tabulate = {version = ">=0.9", extras = ["widechars"]}
-tomli = {version = ">=2.3.0", markers = "python_full_version < \"3.11.0\""}
-wcmatch = ">=10.0"
+tomli = {version = ">=2.3", markers = "python_full_version < \"3.11.0\""}
+wcmatch = ">=10"
 
 [package.extras]
-hjson = ["hjson (>=3.1.0)"]
+hjson = ["hjson (>=3.1)"]
 json5 = ["json5 (>=0.12.1)"]
 jsonc = ["json-with-comments (>=1.2.10)"]
-pygments = ["pygments (>=2.14)", "pygments-ansi-color (>=0.3.0)"]
-pytest = ["pytest (>=9.0.0)"]
-sphinx = ["docutils (>=0.20)", "pygments (>=2.14)", "pygments-ansi-color (>=0.3.0)", "sphinx (>=8.0.0)"]
-xml = ["xmltodict (>=1.0.0)"]
+pygments = ["pygments (>=2.14)", "pygments-ansi-color (>=0.3)"]
+pytest = ["pytest (>=9)"]
+sphinx = ["docutils (>=0.20)", "pygments (>=2.14)", "pygments-ansi-color (>=0.3)", "sphinx (>=8)"]
+xml = ["xmltodict (>=1)"]
 yaml = ["pyyaml (>=6.0.3)"]
 
 [[package]]
@@ -265,14 +265,14 @@ files = [
 
 [[package]]
 name = "extra-platforms"
-version = "8.0.0"
-description = "🔎 Detect architectures, platforms, and CI systems, grouped by family"
+version = "9.2.0"
+description = "🔎 Detect architectures, platforms, shells, terminals and CI systems, grouped by family"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "extra_platforms-8.0.0-py3-none-any.whl", hash = "sha256:44c2815b6dbd73f5eaf961ebeb2d6cca224a6ccf156c298cf6a088ad8ea1b2c6"},
-    {file = "extra_platforms-8.0.0.tar.gz", hash = "sha256:39c5f47f071f8710ce3cba8373fd7744a2a3dc37d5716cc227c23b47e211e5b5"},
+    {file = "extra_platforms-9.2.0-py3-none-any.whl", hash = "sha256:dfd134c712db98aa912d3a569388558ae857bbf94e4d9e083c0c832e610356fb"},
+    {file = "extra_platforms-9.2.0.tar.gz", hash = "sha256:cd59681eff8bb199befe1292fe9f5ef7a314cd7b9302d38401c2fe3bd89168dc"},
 ]
 
 [package.dependencies]
@@ -298,14 +298,14 @@ all = ["flake8 (>=7.1.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2
 
 [[package]]
 name = "lockss-pybasic"
-version = "0.2.0.dev14"
+version = "0.2.0.dev16"
 description = "Basic Python utilities"
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "lockss_pybasic-0.2.0.dev14-py3-none-any.whl", hash = "sha256:2d8776f59b10e380b1b5a4c543395a4e9968afbffa91f6d19fd5692fb486cd86"},
-    {file = "lockss_pybasic-0.2.0.dev14.tar.gz", hash = "sha256:876e8b5b6c4eceea4f63abccd9aae7bfd21d86087be532138fe434717885142c"},
+    {file = "lockss_pybasic-0.2.0.dev16-py3-none-any.whl", hash = "sha256:f93528e47aaab7e7d3f3a07451b36784d3e2ba028abb673f69e99109a9245b02"},
+    {file = "lockss_pybasic-0.2.0.dev16.tar.gz", hash = "sha256:0b1982c88422d48b900e2419ea3469b3ae9f3d7ed617c774c9553dac74e5b0e6"},
 ]
 
 [package.dependencies]
@@ -470,4 +470,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "d0a106e4c315782828e8f2b4b92e28835f1fb8330d307c195833397d1764980d"
+content-hash = "af54bc385914b51063e884fcf489dd6150da950c343e986287c9ee1f5d34e36b"

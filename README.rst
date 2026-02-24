@@ -2,7 +2,7 @@
 Debugpanel
 ==========
 
-.. |RELEASE| replace:: 0.9.0-dev5
+.. |RELEASE| replace:: 0.9.0-dev7
 .. |RELEASE_DATE| replace:: NOT YET RELEASED
 .. |DEBUGPANEL| replace:: **Debugpanel**
 
