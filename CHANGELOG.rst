@@ -2,6 +2,14 @@
 Release Notes
 =============
 
+------
+0.10.0
+------
+
+Released: NOT YET RELEASED
+
+Requires Python 3.10 or greater.
+
 -----
 0.9.0
 -----
