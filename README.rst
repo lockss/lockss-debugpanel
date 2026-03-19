@@ -2,8 +2,8 @@
 Debugpanel
 ==========
 
-.. |RELEASE| replace:: 0.8.2
-.. |RELEASE_DATE| replace:: 2026-02-03
+.. |RELEASE| replace:: 0.9.0-dev7
+.. |RELEASE_DATE| replace:: NOT YET RELEASED
 .. |DEBUGPANEL| replace:: **Debugpanel**
 
 .. image:: https://assets.lockss.org/images/logos/debugpanel/debugpanel_128x128.png
@@ -23,7 +23,7 @@ Debugpanel
 
 Quick Start::
 
-   # Requires Python 3.9-3.13
+   # Requires Python 3.10 or greater
    python --version
 
    # Install with pipx
@@ -36,13 +36,8 @@ Quick Start::
    debugpanel reload-config -n lockss1.example.edu:8081
 
    # Crawl AUIDs from list.txt on lockss1.example.edu:8081 and lockss2.example.edu:8081
-
-   # ...First alternative: each node gets a -n option
    debugpanel crawl -A list.txt -n lockss1.example.edu:8081 -n lockss2.example.edu:8081
 
-   # ...Second alternative: each -n option can have arguments
-   debugpanel crawl -A list.txt -n lockss1.example.edu:8081 lockss2.example.edu:8081
-
-   # ...Third alternative: list lockss1.example.edu:8081 and lockss2.example.edu:8081 in nodes.txt
+   # Alternatively, list lockss1.example.edu:8081 and lockss2.example.edu:8081 in nodes.txt
    debugpanel crawl -A list.txt -N nodes.txt
 
