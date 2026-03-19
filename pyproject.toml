@@ -1,4 +1,4 @@
-# Copyright (c) 2000-2025, Board of Trustees of Leland Stanford Jr. University
+# Copyright (c) 2000-2026, Board of Trustees of Leland Stanford Jr. University
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -28,11 +28,11 @@
 
 [project]
 name = "lockss-debugpanel"
-version = "0.8.2" # Always change in __init__.py, and at release time in README.rst and CHANGELOG.rst
-description = "Library and command line tool to interact with the LOCKSS 1.x DebugPanel servlet"
+version = "0.9.0" # Always change in __init__.py, and at release time in README.rst and CHANGELOG.rst
+description = "Command line tool and Python library to interact with the LOCKSS 1.x DebugPanel servlet"
 license = { text = "BSD-3-Clause" }
 readme = "README.rst"
-requires-python = ">=3.9,<3.14"
+requires-python = ">=3.10,<4.0"
 authors = [
     { name = "Thib Guicherd-Callin",  email = "thib@cs.stanford.edu" },
 ]
@@ -40,10 +40,10 @@ maintainers = [
     { name = "Thib Guicherd-Callin",  email = "thib@cs.stanford.edu" }
 ]
 dependencies = [
-    "lockss-pybasic (>=0.1.0,<0.2.0)",
-    "pydantic (>=2.11.0,<3.0.0)",
-    "pydantic-argparse (>=0.10.0,<0.11.0)",
-    "tabulate (>=0.9.0,<0.10.0)"
+    "click-command-tree (>=1.2.0,<1.3.0)",
+    "click-extra[pygments] (>=7.5.0,<7.6.0)",
+    "click-plugins (>=1.1.1.2,<1.2.0)",
+    "lockss-pybasic (>=0.2.0,<0.3.0)",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",

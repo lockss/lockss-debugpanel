@@ -3,12 +3,34 @@ Release Notes
 =============
 
 -----
+0.9.0
+-----
+
+Released: 2026-03-18
+
+Requires Python 3.10 or greater.
+
+*  **Features**
+
+   *  New command line infrastructure based on `Click Extra <https://kdeldycke.github.io/click-extra>`_, `Cloup <https://cloup.readthedocs.io/>`_ and `Click <https://click.palletsprojects.com/>`_, including expanded tabular output styles, progress bar, command sections and aliases.
+
+   *  New ``--headings``//``--no-headings``, ``--progress``//``--no-progress`` output styles.
+
+*  **Changes**
+
+   *  The alias ``-u`` of ``--username`` and ``-p`` of ``--password`` are deprecated in favor of ``-U`` and ``-P`` respectively.
+
+   *  ``--process-pool`` and ``--thread-pool`` are deprecated in favor of ``--pool-type=process-pool`` and ``--pool-type=thread-pool`` respectively.
+
+   *  ``--output-format`` has been renamed to ``--table-format``/``-T``.
+
+-----
 0.8.2
 -----
 
 Released: 2026-02-03
 
-   *  Requires Python 3.9-3.13.
+Requires Python 3.9-3.13.
 
 -----
 0.8.1
@@ -19,10 +41,6 @@ Released: 2025-08-13
 *  **Bug Fixes**
 
    *  Fixed bug in the processing of ``--nodes`` and ``--auids`` options.
-
-*  **Version 0.8.1-post1** (released: 2026-02-03)
-
-   *  Requires Python 3.9-3.13.
 
 -----
 0.8.0
