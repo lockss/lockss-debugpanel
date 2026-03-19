@@ -42,10 +42,10 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Optional
 
-from click_extra import ChoiceSource, EnumChoice, ExtraContext, Section, TableFormat, color_option, echo, group, option, option_group, pass_context, pass_obj, print_table, progressbar, prompt, show_params_option, table_format_option
+from click_extra import ChoiceSource, EnumChoice, ExtraContext, Section, TableFormat, color_option, echo, group, option, option_group, pass_context, pass_obj, print_table, progressbar, prompt, show_params_option
 from cloup.constraints import mutually_exclusive
 
-from lockss.pybasic.cliutil import NonNegativeInt, click_path, compose_decorators, make_extra_context_settings
+from lockss.pybasic.cliutil import NonNegativeInt, click_path, compose_decorators, make_extra_context_settings, make_table_format_option
 from lockss.pybasic.errorutil import InternalError
 from lockss.pybasic.fileutil import file_lines
 from . import Node, RequestUrlOpenT, check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reload_config, reindex_metadata, validate_files, DEFAULT_DEPTH, __copyright__, __license__, __version__
@@ -266,7 +266,7 @@ _output_option_group = option_group(
     'Output options',
     option('--headings/--no-headings', is_flag=True, default=True, help='Set whether to include column headings in tabular output.'),
     option('--progress/--no-progress', is_flag=True, default=True, help='Set whether to display a progress bar during processing.'),
-    table_format_option(help='Set the rendering of tables to the given style.')
+    make_table_format_option()
 )
 
 
