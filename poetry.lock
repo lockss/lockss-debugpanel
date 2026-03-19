@@ -191,6 +191,21 @@ files = [
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
+name = "click-command-tree"
+version = "1.2.0"
+description = "click plugin to show the command tree of your CLI"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "click_command_tree-1.2.0-1-py3-none-any.whl", hash = "sha256:5213397dc01241db0e7757d34363cd74161027c6141d75973bc1ae65b659449f"},
+    {file = "click_command_tree-1.2.0.tar.gz", hash = "sha256:3e7f5db9f3eccc2eccab40f7979355efe6d5123c958b748dee9c242a38364d6c"},
+]
+
+[package.dependencies]
+click = "*"
+
+[[package]]
 name = "click-extra"
 version = "7.5.3"
 description = "🌈 Drop-in replacement for Click to make user-friendly and colorful CLI"
@@ -208,6 +223,8 @@ click = ">=8.3.1"
 cloup = ">=3.0.7"
 deepmerge = ">=2"
 extra-platforms = ">=8"
+pygments = {version = ">=2.14", optional = true, markers = "extra == \"pygments\""}
+pygments-ansi-color = {version = ">=0.3", optional = true, markers = "extra == \"pygments\""}
 requests = ">=2.32.5"
 tabulate = {version = ">=0.9", extras = ["widechars"]}
 tomli = {version = ">=2.3", markers = "python_full_version < \"3.11.0\""}
@@ -222,6 +239,24 @@ pytest = ["pytest (>=9)"]
 sphinx = ["docutils (>=0.20)", "pygments (>=2.14)", "pygments-ansi-color (>=0.3)", "sphinx (>=8)"]
 xml = ["xmltodict (>=1)"]
 yaml = ["pyyaml (>=6.0.3)"]
+
+[[package]]
+name = "click-plugins"
+version = "1.1.1.2"
+description = "An extension module for click to enable registering CLI commands via setuptools entry-points."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "click_plugins-1.1.1.2-py2.py3-none-any.whl", hash = "sha256:008d65743833ffc1f5417bf0e78e8d2c23aab04d9745ba817bd3e71b0feb6aa6"},
+    {file = "click_plugins-1.1.1.2.tar.gz", hash = "sha256:d7af3984a99d243c131aa1a828331e7630f4a88a9741fd05c927b204bcf92261"},
+]
+
+[package.dependencies]
+click = ">=4.0"
+
+[package.extras]
+dev = ["coveralls", "pytest (>=3.6)", "pytest-cov", "wheel"]
 
 [[package]]
 name = "cloup"
@@ -311,6 +346,36 @@ files = [
 
 [package.dependencies]
 click-extra = ">=7.5.0,<7.6.0"
+
+[[package]]
+name = "pygments"
+version = "2.19.2"
+description = "Pygments is a syntax highlighting package written in Python."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "pygments-2.19.2-py3-none-any.whl", hash = "sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b"},
+    {file = "pygments-2.19.2.tar.gz", hash = "sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887"},
+]
+
+[package.extras]
+windows-terminal = ["colorama (>=0.4.6)"]
+
+[[package]]
+name = "pygments-ansi-color"
+version = "0.3.0"
+description = ""
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "pygments-ansi-color-0.3.0.tar.gz", hash = "sha256:7018954cf5b11d1e734383a1bafab5af613213f246109417fee3f76da26d5431"},
+    {file = "pygments_ansi_color-0.3.0-py3-none-any.whl", hash = "sha256:7eb063feaecadad9d4d1fd3474cbfeadf3486b64f760a8f2a00fc25392180aba"},
+]
+
+[package.dependencies]
+pygments = "!=2.7.3"
 
 [[package]]
 name = "requests"
@@ -471,4 +536,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "e79bd0a874b640fd7ea4b7e339b5d1c80484354d880c467a53902cfcc838d3f9"
+content-hash = "919b6791aaf770530d3e8929c5f9ee8ecc3a5fd98bb866adbffa55f41c8107ca"

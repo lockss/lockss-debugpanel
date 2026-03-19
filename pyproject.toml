@@ -40,7 +40,9 @@ maintainers = [
     { name = "Thib Guicherd-Callin",  email = "thib@cs.stanford.edu" }
 ]
 dependencies = [
-    "click-extra (>=7.5.0,<7.6.0)",
+    "click-command-tree (>=1.2.0,<1.3.0)",
+    "click-extra[pygments] (>=7.5.0,<7.6.0)",
+    "click-plugins (>=1.1.1.2,<1.2.0)",
     "lockss-pybasic (>=0.2.0,<0.3.0)",
 ]
 classifiers = [

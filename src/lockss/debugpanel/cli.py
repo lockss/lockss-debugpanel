@@ -37,12 +37,14 @@ from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPool
 from contextlib import nullcontext
 from dataclasses import dataclass, field
 from enum import Enum
+from importlib.metadata import entry_points
 from inspect import ismethod
 from itertools import chain
 from pathlib import Path
 from typing import Any, Optional
 
 from click_extra import ChoiceSource, EnumChoice, ExtraContext, Section, TableFormat, color_option, echo, group, option, option_group, pass_context, pass_obj, print_table, progressbar, prompt, show_params_option
+from click_plugins import with_plugins
 from cloup.constraints import mutually_exclusive
 
 from lockss.pybasic.cliutil import NonNegativeInt, click_path, compose_decorators, make_extra_context_settings, make_table_format_option
@@ -327,6 +329,7 @@ _auid_operation = compose_decorators(_node_option_group, _auid_option_group, _po
 _node_operation = compose_decorators(_node_option_group, _pool_option_group, _output_option_group, pass_obj)
 
 
+@with_plugins(entry_points(module='click_command_tree')) # adds a 'tree' command
 @group('debugpanel', params=None, context_settings=make_extra_context_settings())
 @color_option
 @show_params_option
