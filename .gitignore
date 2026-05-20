@@ -1,13 +1,16 @@
-# PyCharm artifacts
+# Python
+/**/*.py[co]
+/**/__pycache__
+
+# Poetry
+/poetry.lock
+/dist/
+
+# PyCharm/IntelliJ artifacts
 /.idea/
 
 # Eclipse artifacts
 /.project
-
-# Python and Poetry artifacts
-/dist/
-/**/*.pyc
-/**/*.pyo
 
 # Temporary files
 *.bak
