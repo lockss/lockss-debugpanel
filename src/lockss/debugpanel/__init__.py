@@ -44,7 +44,7 @@ from urllib.request import Request, urlopen
 from typing import Any
 
 
-type RequestUrlOpenT = Any
+RequestUrlOpenT = Any
 
 
 DEFAULT_DEPTH = 123
