@@ -38,10 +38,11 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 '''.strip()
 
-
 from base64 import b64encode
 from urllib.request import Request, urlopen
 from typing import Any
+
+from ._core import *
 
 
 RequestUrlOpenT = Any
