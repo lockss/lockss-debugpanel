@@ -41,16 +41,24 @@ from importlib.metadata import entry_points
 from inspect import ismethod
 from itertools import chain
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, TypeAlias
 
-from click_extra import ChoiceSource, EnumChoice, ExtraContext, Section, TableFormat, color_option, echo, group, option, option_group, pass_context, pass_obj, print_table, progressbar, prompt, show_params_option
+from click_extra import ChoiceSource, EnumChoice, ExtraContext, Section, TableFormat, color_option, context, echo, group, jobs_option, option, option_group, pass_context, pass_obj, print_table, progressbar, prompt, show_params_option
 from click_plugins import with_plugins
 from cloup.constraints import mutually_exclusive
+from pydantic import ValidationError
+import yaml
 
 from lockss.pybasic.cliutil import NonNegativeInt, click_path, compose_decorators, make_extra_context_settings, make_table_format_option
 from lockss.pybasic.errorutil import InternalError
 from lockss.pybasic.fileutil import file_lines
+from lockss.pybasic.nodeutil import NodeSet, get_node_spec_adapter
+
 from . import Node, RequestUrlOpenT, check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reload_config, reindex_metadata, validate_files, DEFAULT_DEPTH, __copyright__, __license__, __version__
+from ._core import DebugPanelClient, UrlOpenT
+
+
+YamlT: TypeAlias = Any
 
 
 class _JobPoolType(Enum):
@@ -63,51 +71,29 @@ class _JobPoolType(Enum):
 _DEFAULT_JOB_POOL_TYPE: _JobPoolType = _JobPoolType.THREAD_POOL
 
 
-@dataclass(kw_only=True)
-class _Opts:
-    """Data class to hold parsed command line options."""
-    # Node operation
-    node: tuple[str, ...] = ()
-    nodes: tuple[Path, ...] = ()
-    u: Optional[str] = None # DEPRECATED
-    username: Optional[str] = None
-    p: Optional[str] = field(default=None, repr=False) # DEPRECATED
-    password: Optional[str] = field(default=None, repr=False)
-    # AUID operation
-    auid: tuple[str, ...] = ()
-    auids: tuple[Path, ...] = ()
-    # Depth
-    depth: Optional[int] = None
-    # Job pool
-    pool_size: Optional[int] = None
-    pool_type: Optional[_JobPoolType] = None
-    process_pool: bool = False # DEPRECATED
-    thread_pool: bool = False # DEPRECATED
-    # Output
-    headings: Optional[bool] = None
-    progress: Optional[bool] = None
-    table_format: Optional[TableFormat] = None
-
-    def __post_init__(self):
-        """Post-initialization method, to handle deprecated options."""
-        if self.u:
-            self.username, self.u = self.u, None
-        if self.p:
-            self.password, self.p = self.p, None
-        if self.process_pool:
-            self.pool_type, self.process_pool = _JobPoolType.PROCESS_POOL, False
-        if self.thread_pool:
-            self.pool_type, self.thread_pool = _JobPoolType.THREAD_POOL, False
-        if not self.username:
-            self.username = prompt('UI username')
-        if not self.password:
-            self.password = prompt('UI password', hide_input=True, confirmation_prompt=False)
-        if not self.pool_type:
-            self.pool_type = _DEFAULT_JOB_POOL_TYPE
-
-
 class _DebugPanelCli(object):
     """DebugPanel command line application."""
+
+    @dataclass(kw_only=True)
+    class _Opts:
+        """Data class to hold parsed command line options."""
+        # Node operation
+        node_sets: tuple[Path, ...] = ()
+        node_spec: tuple[str, ...] = ()
+        node_specs: tuple[Path, ...] = ()
+        username: Optional[str] = None
+        password: Optional[str] = field(default=None, repr=False)
+        # AUID operation
+        auid: tuple[str, ...] = ()
+        auids: tuple[Path, ...] = ()
+        # Depth
+        depth: Optional[int] = None
+        # Job pool
+        pool_size: Optional[int] = None # DEPRECATED
+        # Output
+        headings: Optional[bool] = None
+        progress: Optional[bool] = None
+        table_format: Optional[TableFormat] = None
 
     def __init__(self, ctx: ExtraContext):
         """
@@ -118,10 +104,11 @@ class _DebugPanelCli(object):
         """
         super().__init__()
         self._ctx: ExtraContext = ctx
-        self._opts: Optional[_Opts] = None
+        self._opts: Optional[_DebugPanelCli._Opts] = None
         self._auids: Optional[list[str]] = None
         self._executor: Optional[Executor] = None
         self._nodes: Optional[list[str]] = None
+        self._clients: Optional[list[DebugPanelClient]] = None
 
     def check_substance(self) -> None:
         """Implementation of the ``check-substance`` command."""
@@ -133,7 +120,7 @@ class _DebugPanelCli(object):
 
     def crawl_plugins(self) -> None:
         """Implementation of the ``crawl-plugins`` command."""
-        self._do_node_command(crawl_plugins)
+        self._do_node_command(DebugPanelClient.crawl_plugins)
 
     def deep_crawl(self) -> None:
         """Implementation of the ``deep-crawl`` command."""
@@ -155,7 +142,7 @@ class _DebugPanelCli(object):
         """
         if not ismethod(method):
             raise InternalError() from ValueError(method)
-        self._opts = _Opts(**cli_kwargs)
+        self._opts = _DebugPanelCli._Opts(**cli_kwargs)
         method()
 
     def poll(self) -> None:
@@ -168,7 +155,7 @@ class _DebugPanelCli(object):
 
     def reload_config(self) -> None:
         """Implementation of the ``reload-config`` command."""
-        self._do_node_command(reload_config)
+        self._do_node_command(DebugPanelClient.reload_config)
 
     def validate_files(self) -> None:
         """Implementation of the ``validate-files`` command."""
@@ -206,7 +193,7 @@ class _DebugPanelCli(object):
                     table_format=opts.table_format)
 
     def _do_node_command(self,
-                         node_func: Callable[[Node], RequestUrlOpenT],
+                         node_func: Callable[[DebugPanelClient], UrlOpenT],
                          **kwargs) -> None:
         """
         Performs one node-centric command.
@@ -217,13 +204,14 @@ class _DebugPanelCli(object):
         """
         self._initialize_node_operation()
         opts = self._opts
-        node_objects = [Node(node, opts.username, opts.password) for node in self._nodes]
-        futures: dict[Future, str] = {self._executor.submit(node_func, node_object, **kwargs): node for node, node_object in zip(self._nodes, node_objects)}
+        #node_objects = [Node(node, opts.username, opts.password) for node in self._nodes]
+        #futures: dict[Future, str] = {self._executor.submit(node_func, node_object, **kwargs): node for node, node_object in zip(self._nodes, node_objects)}
+        futures: dict[Future, DebugPanelClient] = {self._executor.submit(lambda c: m(c), client, **kwargs): client for client in self._clients}
         completed: Iterator[Future] = as_completed(futures)
         results: dict[str, Any] = {}
         with progressbar(completed, length=len(futures), label='Progress') if opts.progress else nullcontext(completed) as bar:
             for future in bar:
-                node = futures[future]
+                client: DebugPanelClient = futures[future]
                 try:
                     with future.result() as resp:
                         status: int = resp.status
@@ -250,16 +238,30 @@ class _DebugPanelCli(object):
         Initializes for a node-centric operation. Fails if the list of nodes
         ends up being empty.
         """
-        self._nodes = [*(opts := self._opts).node, *chain.from_iterable(file_lines(file_path) for file_path in opts.nodes)]
-        if len(self._nodes) == 0:
+        # First, process the nodes...
+        clients: list[DebugPanelClient] = list()
+        # ...first from node sets
+        for node_set_path in (opts := self._opts).node_sets:
+            with node_set_path.open('r') as node_set_input:
+                try:
+                    node_set_yaml: YamlT = yaml.safe_load(node_set_input)
+                    node_set: NodeSet = NodeSet.model_validate(node_set_yaml)
+                    for node_spec in node_set.nodes:
+                        clients.append(DebugPanelClient(node_spec))
+                except (yaml.YAMLError, ValidationError) as exc:
+                    self._ctx.fail(str(exc))
+        # ...then from compact node specifications
+        for compact_node_spec in [*opts.node_spec, *chain.from_iterable(file_lines(file_path) for file_path in opts.node_specs)]:
+            try:
+                clients.append(DebugPanelClient(get_node_spec_adapter().validate_python(compact_node_spec)))
+            except ValidationError as exc:
+                self._ctx.fail(str(exc))
+        if len(clients) == 0:
             self._ctx.fail('The list of nodes to process is empty')
-        match opts.pool_type:
-            case _JobPoolType.PROCESS_POOL:
-                self._executor = ProcessPoolExecutor(max_workers=opts.pool_size)
-            case _JobPoolType.THREAD_POOL:
-                self._executor = ThreadPoolExecutor(max_workers=opts.pool_size)
-            case _:
-                raise InternalError() from ValueError(opts.pool_type)
+        self._clients = clients
+        # Then, initialize the thread pool
+        self._executor = ThreadPoolExecutor(max_workers=opts.pool_size or self._ctx.meta[context.JOBS])
+        # Finally, prompt for credentials
         if opts.username is None:
             opts.username = prompt('UI username')
         if opts.password is None:
@@ -281,21 +283,14 @@ _depth_option_group = option_group(
 )
 
 
-#: The node option group: --node/-n, --nodes/-N, --username/-U, --password/-P
+#: The node option group: --node/-n, --nodes/-N, --node-set/-s, --username/-U, --password/-P
 _node_option_group = option_group(
     'Node options',
-    option('--node', '-n', metavar='NODE', multiple=True, help='Add NODE to the list of nodes to process.'),
-    option('--nodes', '-N', metavar='FILE', type=click_path('ferz'), multiple=True, help='Add the nodes in FILE to the list of nodes to process.'),
-    mutually_exclusive(
-        # option('--username', '-U', metavar='USER', show_default='interactive prompt', help='Set the UI username to USER.', prompt='UI username'),
-        option('--username', '-U', metavar='USER', show_default='interactive prompt', help='Set the UI username to USER.'),
-        option('-u', metavar='USER', deprecated='Use -U instead.')
-    ),
-    mutually_exclusive(
-        # password_option('--password', '-P', metavar='PASS', show_default='interactive prompt', help='Set the UI password to PASS.', prompt='UI password', confirmation_prompt=False),
-        option('--password', '-P', metavar='PASS', show_default='interactive prompt', help='Set the UI password to PASS.'),
-        option('-p', metavar='PASS', deprecated='Use -P instead.')
-    )
+    option('--node-set', '-s', metavar='FILE', multiple=True, help='Add the nodes from the node set in FILE to the list of nodes to process.'),
+    option('--node-spec', '--node', '-n', metavar='NODE', multiple=True, help='Add the compact node specification NODE to the list of nodes to process.'),
+    option('--node-specs', '--nodes', '-N', metavar='FILE', type=click_path('ferz'), multiple=True, help='Add the compact node specifications in FILE to the list of nodes to process.'),
+    option('--username', '-U', metavar='USER', show_default='interactive prompt', help='Set the UI username to USER.'),
+    option('--password', '-P', metavar='PASS', show_default='interactive prompt', help='Set the UI password to PASS.'),
 )
 
 
@@ -308,25 +303,21 @@ _output_option_group = option_group(
 )
 
 
-#: The job pool option group: --pool-size, --pool-type
-_pool_option_group = option_group(
-    'Job pool options',
-    option('--pool-size', metavar='SIZE', type=Optional[NonNegativeInt], default=None, help='Set the job pool size to SIZE.', show_default='CPU-dependent'),
-    mutually_exclusive(
-        # option('--pool-type', type=EnumChoice(choices=_JobPoolType, choice_source=ChoiceSource.VALUE), default=_DEFAULT_JOB_POOL_TYPE, help=f'Set the job pool type to the given type.'),
-        option('--pool-type', type=EnumChoice(choices=_JobPoolType, choice_source=ChoiceSource.VALUE), show_default=_DEFAULT_JOB_POOL_TYPE, help=f'Set the job pool type to the given type.'),
-        option('--process-pool', is_flag=True, deprecated='Use --pool-type=process-pool instead.'),
-        option('--thread-pool', is_flag=True, deprecated='Use --pool-type=thread-pool instead.')
-    )
+#: The job option group: --pool-size, --pool-type
+_job_option_group = option_group(
+    'Job options',
+    jobs_option,
+    option('--pool-size', metavar='SIZE', type=Optional[NonNegativeInt], default=None, deprecated='Use --jobs instead.'),
+    constraint=mutually_exclusive
 )
 
 
 #: The composite AUID operation decorator.
-_auid_operation = compose_decorators(_node_option_group, _auid_option_group, _pool_option_group, _output_option_group, pass_obj)
+_auid_operation = compose_decorators(_node_option_group, _auid_option_group, _job_option_group, _output_option_group, pass_obj)
 
 
 #: The composite node operation decorator.
-_node_operation = compose_decorators(_node_option_group, _pool_option_group, _output_option_group, pass_obj)
+_node_operation = compose_decorators(_node_option_group, _job_option_group, _output_option_group, pass_obj)
 
 
 @with_plugins(entry_points(module='click_command_tree')) # adds a 'tree' command
@@ -375,7 +366,7 @@ def _crawl_plugins(cli: _DebugPanelCli, **kwargs) -> None:
 
 
 @_debugpanel.command('deep-crawl', aliases=['dc'], section=_AUID_COMMANDS, help='Cause nodes to deep-crawl AUs.')
-@compose_decorators(_node_option_group, _auid_option_group, _depth_option_group, _pool_option_group, _output_option_group, pass_obj)
+@compose_decorators(_node_option_group, _auid_option_group, _depth_option_group, _job_option_group, _output_option_group, pass_obj)
 def _deep_crawl(cli: _DebugPanelCli, **kwargs) -> None:
     """Cause nodes to deep-crawl AUs."""
     cli.dispatch(cli.deep_crawl, **kwargs)

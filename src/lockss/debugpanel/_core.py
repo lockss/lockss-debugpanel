@@ -252,6 +252,9 @@ class DebugPanelClient(_DebugPanelAdapter):
     def disable_indexing(self, auid: str) -> UrlOpenT:
         return self._adapter.disable_indexing(auid)
 
+    def get_node_spec(self) -> NodeSpec:
+        return self._node_spec.model_copy()
+
     def poll(self, auid: str) -> UrlOpenT:
         return self._adapter.poll(auid)
 
