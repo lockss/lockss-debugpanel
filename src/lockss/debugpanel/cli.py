@@ -33,7 +33,7 @@ Command line tool to interact with the LOCKSS 1.x DebugPanel servlet.
 """
 
 from collections.abc import Callable, Iterator
-from concurrent.futures import Executor, Future, ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from concurrent.futures import Executor, Future, ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from dataclasses import dataclass, field
 from enum import Enum
@@ -52,7 +52,7 @@ import yaml
 from lockss.pybasic.cliutil import NonNegativeInt, click_path, compose_decorators, make_extra_context_settings, make_table_format_option
 from lockss.pybasic.errorutil import InternalError
 from lockss.pybasic.fileutil import file_lines
-from lockss.pybasic.nodeutil import NodeSet, get_node_spec_adapter
+from lockss.pybasic.nodeutil import NodeIdentifier, NodeSet, get_node_spec_adapter
 
 from . import Node, RequestUrlOpenT, check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reload_config, reindex_metadata, validate_files, DEFAULT_DEPTH, __copyright__, __license__, __version__
 from ._core import DebugPanelClient, UrlOpenT
@@ -78,7 +78,7 @@ class _DebugPanelCli(object):
     class _Opts:
         """Data class to hold parsed command line options."""
         # Node operation
-        node_sets: tuple[Path, ...] = ()
+        node_set: tuple[Path, ...] = ()
         node_spec: tuple[str, ...] = ()
         node_specs: tuple[Path, ...] = ()
         username: Optional[str] = None
@@ -93,7 +93,6 @@ class _DebugPanelCli(object):
         # Output
         headings: Optional[bool] = None
         progress: Optional[bool] = None
-        table_format: Optional[TableFormat] = None
 
     def __init__(self, ctx: ExtraContext):
         """
@@ -108,7 +107,7 @@ class _DebugPanelCli(object):
         self._auids: Optional[list[str]] = None
         self._executor: Optional[Executor] = None
         self._nodes: Optional[list[str]] = None
-        self._clients: Optional[list[DebugPanelClient]] = None
+        self._clients: list[DebugPanelClient] = list()
 
     def check_substance(self) -> None:
         """Implementation of the ``check-substance`` command."""
@@ -193,35 +192,36 @@ class _DebugPanelCli(object):
                     table_format=opts.table_format)
 
     def _do_node_command(self,
-                         node_func: Callable[[DebugPanelClient], UrlOpenT],
+                         func_client: Callable[[DebugPanelClient], UrlOpenT],
                          **kwargs) -> None:
         """
         Performs one node-centric command.
 
-        :param node_func: A function that applies to a ``Node`` and returns
+        :param func_client: A function that applies to a ``Node`` and returns
                           what ``urllib.request.urlopen`` returns.
-        :type node_func: Callable[[Node], RequestUrlOpenT]
+        :type func_client: Callable[[Node], RequestUrlOpenT]
         """
         self._initialize_node_operation()
         opts = self._opts
         #node_objects = [Node(node, opts.username, opts.password) for node in self._nodes]
         #futures: dict[Future, str] = {self._executor.submit(node_func, node_object, **kwargs): node for node, node_object in zip(self._nodes, node_objects)}
-        futures: dict[Future, DebugPanelClient] = {self._executor.submit(lambda c: m(c), client, **kwargs): client for client in self._clients}
+        futures: dict[Future, DebugPanelClient] = {self._executor.submit(lambda c: func_client(c), client, **kwargs): client for client in self._clients}
         completed: Iterator[Future] = as_completed(futures)
-        results: dict[str, Any] = {}
+        results: dict[NodeIdentifier, Any] = {}
         with progressbar(completed, length=len(futures), label='Progress') if opts.progress else nullcontext(completed) as bar:
             for future in bar:
                 client: DebugPanelClient = futures[future]
+                k = (ns := client.get_node_spec()).id or str(ns)
                 try:
                     with future.result() as resp:
                         status: int = resp.status
                         reason: str = resp.reason
-                        results[node] = 'Requested' if status == 200 else reason
+                        results[k] = 'Requested' if status == 200 else reason
                 except Exception as exc:
-                    results[node] = exc
-        print_table([[node, results[node]] for node in self._nodes],
+                    results[k] = exc
+        print_table([[k, r] for k, r in sorted(results.items())],
                     headers=['Node', 'Result'] if opts.headings else None,
-                    table_format=self._opts.table_format)
+                    table_format=self._ctx.meta[context.TABLE_FORMAT])
 
     def _initialize_auid_operation(self) -> None:
         """
@@ -241,7 +241,7 @@ class _DebugPanelCli(object):
         # First, process the nodes...
         clients: list[DebugPanelClient] = list()
         # ...first from node sets
-        for node_set_path in (opts := self._opts).node_sets:
+        for node_set_path in (opts := self._opts).node_set:
             with node_set_path.open('r') as node_set_input:
                 try:
                     node_set_yaml: YamlT = yaml.safe_load(node_set_input)
@@ -258,7 +258,7 @@ class _DebugPanelCli(object):
                 self._ctx.fail(str(exc))
         if len(clients) == 0:
             self._ctx.fail('The list of nodes to process is empty')
-        self._clients = clients
+        self._clients.extend(clients)
         # Then, initialize the thread pool
         self._executor = ThreadPoolExecutor(max_workers=opts.pool_size or self._ctx.meta[context.JOBS])
         # Finally, prompt for credentials
