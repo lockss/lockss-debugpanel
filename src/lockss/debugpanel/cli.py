@@ -211,7 +211,7 @@ class _DebugPanelCli(object):
         with progressbar(completed, length=len(futures), label='Progress') if opts.progress else nullcontext(completed) as bar:
             for future in bar:
                 client: DebugPanelClient = futures[future]
-                k = (ns := client.get_node_spec()).id or str(ns)
+                k = client.get_node_spec().id
                 try:
                     with future.result() as resp:
                         status: int = resp.status
