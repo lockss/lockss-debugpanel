@@ -43,19 +43,20 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Optional, TypeAlias
 
-from click_extra import ChoiceSource, EnumChoice, ExtraContext, Section, TableFormat, color_option, context, echo, group, jobs_option, option, option_group, pass_context, pass_obj, print_table, progressbar, prompt, show_params_option
+from click_extra import ExtraContext, Section, accessible_option, color_option, context, echo, group, jobs_option, option, option_group, pass_context, pass_obj, print_sorted_table, progressbar, prompt, show_params_option, table_format_option, timer_option
+from click_extra.execution import DEFAULT_JOBS
 from click_plugins import with_plugins
 from cloup.constraints import mutually_exclusive
 from pydantic import ValidationError
 import yaml
 
-from lockss.pybasic.cliutil import NonNegativeInt, click_path, compose_decorators, make_extra_context_settings, make_table_format_option
+from lockss.pybasic.cliutil import NonNegativeInt, click_path, compose_decorators
 from lockss.pybasic.errorutil import InternalError
 from lockss.pybasic.fileutil import file_lines
 from lockss.pybasic.nodeutil import NodeIdentifier, NodeSet, get_node_spec_adapter
 
-from . import Node, RequestUrlOpenT, check_substance, crawl, crawl_plugins, deep_crawl, disable_indexing, poll, reload_config, reindex_metadata, validate_files, DEFAULT_DEPTH, __copyright__, __license__, __version__
-from ._core import DebugPanelClient, UrlOpenT
+from . import __copyright__, __license__, __version__
+from ._core import DebugPanelClient, UrlOpenT, DEFAULT_DEPTH
 
 
 YamlT: TypeAlias = Any
@@ -77,22 +78,29 @@ class _DebugPanelCli(object):
     @dataclass(kw_only=True)
     class _Opts:
         """Data class to hold parsed command line options."""
-        # Node operation
+        # Node options
         node_set: tuple[Path, ...] = ()
         node_spec: tuple[str, ...] = ()
         node_specs: tuple[Path, ...] = ()
         username: Optional[str] = None
         password: Optional[str] = field(default=None, repr=False)
-        # AUID operation
+        # AUID options
         auid: tuple[str, ...] = ()
         auids: tuple[Path, ...] = ()
-        # Depth
+        # Depth options
         depth: Optional[int] = None
-        # Job pool
+        # Job options
+        jobs: Optional[int] = None
         pool_size: Optional[int] = None # DEPRECATED
-        # Output
+        # Tabular output options
         headings: Optional[bool] = None
+        table_format: Optional[str] = None
+        # Display options
+        accessible: Optional[bool] = None
+        color: Optional[bool] = None
         progress: Optional[bool] = None
+        theme: Optional[str] = None
+        time: Optional[bool] = None
 
     def __init__(self, ctx: ExtraContext):
         """
@@ -111,11 +119,11 @@ class _DebugPanelCli(object):
 
     def check_substance(self) -> None:
         """Implementation of the ``check-substance`` command."""
-        self._do_auid_command(check_substance)
+        self._do_auid_command(DebugPanelClient.check_substance)
 
     def crawl(self) -> None:
         """Implementation of the ``crawl`` command."""
-        self._do_auid_command(crawl)
+        self._do_auid_command(DebugPanelClient.crawl)
 
     def crawl_plugins(self) -> None:
         """Implementation of the ``crawl-plugins`` command."""
@@ -123,11 +131,11 @@ class _DebugPanelCli(object):
 
     def deep_crawl(self) -> None:
         """Implementation of the ``deep-crawl`` command."""
-        self._do_auid_command(deep_crawl, depth=self._opts.depth)
+        self._do_auid_command(DebugPanelClient.deep_crawl, depth=self._opts.depth)
 
     def disable_indexing(self) -> None:
         """Implementation of the ``disable-indexing`` command."""
-        self._do_auid_command(disable_indexing)
+        self._do_auid_command(DebugPanelClient.disable_indexing)
 
     def dispatch(self, method: Callable[[], None], **cli_kwargs) -> None:
         """
@@ -146,11 +154,11 @@ class _DebugPanelCli(object):
 
     def poll(self) -> None:
         """Implementation of the ``poll`` command."""
-        self._do_auid_command(poll)
+        self._do_auid_command(DebugPanelClient.poll)
 
     def reindex_metadata(self) -> None:
         """Implementation of the ``reindex-metadata`` command."""
-        self._do_auid_command(reindex_metadata)
+        self._do_auid_command(DebugPanelClient.reindex_metadata)
 
     def reload_config(self) -> None:
         """Implementation of the ``reload-config`` command."""
@@ -158,38 +166,40 @@ class _DebugPanelCli(object):
 
     def validate_files(self) -> None:
         """Implementation of the ``validate-files`` command."""
-        self._do_auid_command(validate_files)
+        self._do_auid_command(DebugPanelClient.validate_files)
 
     def _do_auid_command(self,
-                         node_auid_func: Callable[[Node, str], RequestUrlOpenT],
+                         func_client_auid: Callable[[DebugPanelClient, str], UrlOpenT],
                          **kwargs) -> None:
         """
         Performs one AUID-centric command.
 
-        :param node_auid_func: A function that applies to a ``Node`` and an AUID
-                               and returns what ``urllib.request.urlopen``
-                               returns.
-        :type node_auid_func: Callable[[Node, str], RequestUrlOpenT]
+        :param func_client_auid: A function that applies to a
+                                 ``DebugPanelClient`` and an AUID and returns
+                                  what ``urllib.request.urlopen`` returns.
+        :type func_client_auid: Callable[[DebugPanelClient, str], UrlOpenT]
         """
         self._initialize_auid_operation()
-        opts = self._opts
-        node_objects = [Node(node, opts.username, opts.password) for node in self._nodes]
-        futures: dict[Future, tuple[str, str]] = {self._executor.submit(node_auid_func, node_object, auid, **kwargs): (node, auid) for auid in self._auids for node, node_object in zip(self._nodes, node_objects)}
-        completed: Iterator[Future] = as_completed(futures)
-        results: dict[tuple[str, str], Any] = {}
+        opts: _DebugPanelCli._Opts = self._opts
+        futures: dict[Future[UrlOpenT], tuple[DebugPanelClient, str]] = {self._executor.submit(func_client_auid, client, auid, **kwargs): (client, auid) for auid in self._auids for client in self._clients}
+        completed: Iterator[Future[UrlOpenT]] = as_completed(futures)
+        results: dict[tuple[NodeIdentifier, str], str] = {}
         with progressbar(completed, length=len(futures), label='Progress') if opts.progress else nullcontext(completed) as bar:
             for future in bar:
-                node_auid = futures[future]
+                client, auid = futures[future]
+                k: tuple[NodeIdentifier, str] = (client.get_id(), auid)
                 try:
                     with future.result() as resp:
                         status: int = resp.status
                         reason: str = resp.reason
-                        results[node_auid] = 'Requested' if status == 200 else reason
+                        results[k] = 'Requested' if status == 200 else reason
                 except Exception as exc:
-                    results[node_auid] = exc
-        print_table([[auid, *[results[(node, auid)] for node in self._nodes]] for auid in self._auids],
-                    headers=['AUID', *self._nodes] if opts.headings else None,
-                    table_format=opts.table_format)
+                    results[k] = str(exc)
+        sorted_ids = sorted(client.get_id() for client in self._clients)
+        print_sorted_table([('AUID', 'auid'), *[(i, None) for i in sorted_ids]],
+                           [[a, *[results[(i, a)] for i in sorted_ids]] for a in self._auids],
+                           sort_columns=['auid'],
+                           table_format=opts.table_format)
 
     def _do_node_command(self,
                          func_client: Callable[[DebugPanelClient], UrlOpenT],
@@ -197,31 +207,30 @@ class _DebugPanelCli(object):
         """
         Performs one node-centric command.
 
-        :param func_client: A function that applies to a ``Node`` and returns
-                          what ``urllib.request.urlopen`` returns.
-        :type func_client: Callable[[Node], RequestUrlOpenT]
+        :param func_client: A function that applies to a ``DebugPanelClient`` and
+                            returns what ``urllib.request.urlopen`` returns.
+        :type func_client: Callable[[DebugPanelClient], UrlOpenT]
         """
         self._initialize_node_operation()
-        opts = self._opts
-        #node_objects = [Node(node, opts.username, opts.password) for node in self._nodes]
-        #futures: dict[Future, str] = {self._executor.submit(node_func, node_object, **kwargs): node for node, node_object in zip(self._nodes, node_objects)}
-        futures: dict[Future, DebugPanelClient] = {self._executor.submit(lambda c: func_client(c), client, **kwargs): client for client in self._clients}
-        completed: Iterator[Future] = as_completed(futures)
-        results: dict[NodeIdentifier, Any] = {}
+        opts: _DebugPanelCli._Opts = self._opts
+        futures: dict[Future[UrlOpenT], DebugPanelClient] = {self._executor.submit(func_client, client, **kwargs): client for client in self._clients}
+        completed: Iterator[Future[UrlOpenT]] = as_completed(futures)
+        results: dict[NodeIdentifier, str] = {}
         with progressbar(completed, length=len(futures), label='Progress') if opts.progress else nullcontext(completed) as bar:
             for future in bar:
                 client: DebugPanelClient = futures[future]
-                k = client.get_node_spec().id
+                k: NodeIdentifier = client.get_id()
                 try:
                     with future.result() as resp:
                         status: int = resp.status
                         reason: str = resp.reason
                         results[k] = 'Requested' if status == 200 else reason
                 except Exception as exc:
-                    results[k] = exc
-        print_table([[k, r] for k, r in sorted(results.items())],
-                    headers=['Node', 'Result'] if opts.headings else None,
-                    table_format=self._ctx.meta[context.TABLE_FORMAT])
+                    results[k] = str(exc)
+        print_sorted_table([('Node', 'node'), ('Result', None)],
+                           [[i, results[i]] for i in results],
+                           sort_columns=['node'],
+                           table_format=opts.table_format)
 
     def _initialize_auid_operation(self) -> None:
         """
@@ -258,14 +267,14 @@ class _DebugPanelCli(object):
                 self._ctx.fail(str(exc))
         if len(clients) == 0:
             self._ctx.fail('The list of nodes to process is empty')
-        self._clients.extend(clients)
         # Then, initialize the thread pool
         self._executor = ThreadPoolExecutor(max_workers=opts.pool_size or self._ctx.meta[context.JOBS])
-        # Finally, prompt for credentials
-        if opts.username is None:
-            opts.username = prompt('UI username')
-        if opts.password is None:
-            opts.password = prompt('UI password', hide_input=True)
+        # Finally, authenticate
+        u, opts.username = opts.username if opts.username else prompt('UI username'), None
+        p, opts.password = opts.password if opts.password else prompt('UI password', hide_input=True), None
+        for client in clients:
+            client.authenticate(u, p)
+        self._clients.extend(clients)
 
 
 #: The AUID option group: --auid/-a, --auids/-A
@@ -286,7 +295,7 @@ _depth_option_group = option_group(
 #: The node option group: --node/-n, --nodes/-N, --node-set/-s, --username/-U, --password/-P
 _node_option_group = option_group(
     'Node options',
-    option('--node-set', '-s', metavar='FILE', multiple=True, help='Add the nodes from the node set in FILE to the list of nodes to process.'),
+    option('--node-set', '-s', metavar='FILE', type=click_path('ferz'), multiple=True, help='Add the nodes from the node set in FILE to the list of nodes to process.'),
     option('--node-spec', '--node', '-n', metavar='NODE', multiple=True, help='Add the compact node specification NODE to the list of nodes to process.'),
     option('--node-specs', '--nodes', '-N', metavar='FILE', type=click_path('ferz'), multiple=True, help='Add the compact node specifications in FILE to the list of nodes to process.'),
     option('--username', '-U', metavar='USER', show_default='interactive prompt', help='Set the UI username to USER.'),
@@ -294,38 +303,46 @@ _node_option_group = option_group(
 )
 
 
-#: The output option group: --headings/--no-headings, --progress/--no-progress, --table-format/-T
-_output_option_group = option_group(
-    'Output options',
+#: The tabular output option group: --headings/--no-headings, --progress/--no-progress, --table-format/-T
+_tabular_output_option_group = option_group(
+    'Tabular output options',
     option('--headings/--no-headings', is_flag=True, default=True, help='Set whether to include column headings in tabular output.'),
-    option('--progress/--no-progress', is_flag=True, default=True, help='Set whether to display a progress bar during processing.'),
-    make_table_format_option()
+    table_format_option('--table-format', '-T', expose_value=True)
 )
 
 
 #: The job option group: --pool-size, --pool-type
 _job_option_group = option_group(
     'Job options',
-    jobs_option,
-    option('--pool-size', metavar='SIZE', type=Optional[NonNegativeInt], default=None, deprecated='Use --jobs instead.'),
+    jobs_option(expose_value=True),
+    option('--pool-size', metavar='SIZE', type=NonNegativeInt, default=DEFAULT_JOBS, deprecated='Use --jobs instead.'),
     constraint=mutually_exclusive
 )
 
 
+#: The display option group: --progress/--no-progress
+_display_option_group = option_group(
+    'Display options',
+    accessible_option(expose_value=True),
+    color_option(expose_value=True),
+    option('--progress/--no-progress', is_flag=True, default=True, help='Set whether to display a progress bar during processing.'),
+    timer_option(expose_value=True),
+)
+
+
 #: The composite AUID operation decorator.
-_auid_operation = compose_decorators(_node_option_group, _auid_option_group, _job_option_group, _output_option_group, pass_obj)
+_auid_operation = compose_decorators(_node_option_group, _auid_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, pass_obj)
 
 
 #: The composite node operation decorator.
-_node_operation = compose_decorators(_node_option_group, _job_option_group, _output_option_group, pass_obj)
+_node_operation = compose_decorators(_node_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, pass_obj)
 
 
 @with_plugins(entry_points(module='click_command_tree')) # adds a 'tree' command
-@group('debugpanel', params=None, context_settings=make_extra_context_settings())
-@color_option
+@group(params=None)
 @show_params_option
 @pass_context
-def _debugpanel(ctx: ExtraContext, **kwargs):
+def debugpanel(ctx: ExtraContext, **kwargs):
     """Command line tool to interact with the LOCKSS 1.x DebugPanel servlet."""
     ctx.obj = _DebugPanelCli(ctx)
 
@@ -338,82 +355,82 @@ _AUID_COMMANDS = Section('AUID commands')
 _NODE_COMMANDS = Section('Node commands')
 
 
-@_debugpanel.command('check-substance', aliases=['cs'], section=_AUID_COMMANDS, help='Cause nodes to check the substance of AUs.')
+@debugpanel.command(aliases=['cs'], section=_AUID_COMMANDS, help='Cause nodes to check the substance of AUs.')
 @_auid_operation
-def _check_substance(cli: _DebugPanelCli, **kwargs) -> None:
+def check_substance(cli: _DebugPanelCli, **kwargs) -> None:
     """Cause nodes to check the substance of AUs."""
     cli.dispatch(cli.check_substance, **kwargs)
 
 
-@_debugpanel.command('copyright', help='Show the copyright and exit.')
-def _copyright() -> None:
+@debugpanel.command(help='Show the copyright and exit.')
+def copyright() -> None:
     """Show the copyright and exit."""
     echo(__copyright__)
 
 
-@_debugpanel.command('crawl', aliases=['cr'], section=_AUID_COMMANDS, help='Cause nodes to crawl AUs.')
+@debugpanel.command(aliases=['cr'], section=_AUID_COMMANDS, help='Cause nodes to crawl AUs.')
 @_auid_operation
-def _crawl(cli: _DebugPanelCli, **kwargs) -> None:
+def crawl(cli: _DebugPanelCli, **kwargs) -> None:
     """Cause nodes to crawl AUs."""
     cli.dispatch(cli.crawl, **kwargs)
 
 
-@_debugpanel.command('crawl-plugins', aliases=['cp'], section=_NODE_COMMANDS, help='Cause nodes to crawl plugins.')
+@debugpanel.command(aliases=['cp'], section=_NODE_COMMANDS, help='Cause nodes to crawl plugins.')
 @_node_operation
-def _crawl_plugins(cli: _DebugPanelCli, **kwargs) -> None:
+def crawl_plugins(cli: _DebugPanelCli, **kwargs) -> None:
     """Cause nodes to crawl plugins."""
     cli.dispatch(cli.crawl_plugins, **kwargs)
 
 
-@_debugpanel.command('deep-crawl', aliases=['dc'], section=_AUID_COMMANDS, help='Cause nodes to deep-crawl AUs.')
-@compose_decorators(_node_option_group, _auid_option_group, _depth_option_group, _job_option_group, _output_option_group, pass_obj)
-def _deep_crawl(cli: _DebugPanelCli, **kwargs) -> None:
+@debugpanel.command(aliases=['dc'], section=_AUID_COMMANDS, help='Cause nodes to deep-crawl AUs.')
+@compose_decorators(_node_option_group, _auid_option_group, _depth_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, pass_obj)
+def deep_crawl(cli: _DebugPanelCli, **kwargs) -> None:
     """Cause nodes to deep-crawl AUs."""
     cli.dispatch(cli.deep_crawl, **kwargs)
 
 
-@_debugpanel.command('disable-indexing', aliases=['di'], section=_AUID_COMMANDS, help='Cause nodes to disable metadata indexing for AUs.')
+@debugpanel.command(aliases=['di'], section=_AUID_COMMANDS, help='Cause nodes to disable metadata indexing for AUs.')
 @_auid_operation
-def _disable_indexing(cli: _DebugPanelCli, **kwargs) -> None:
+def disable_indexing(cli: _DebugPanelCli, **kwargs) -> None:
     """Cause nodes to disable metadata indexing for AUs."""
     cli.dispatch(cli.disable_indexing, **kwargs)
 
 
-@_debugpanel.command('license', help='Show the software license and exit.')
+@debugpanel.command(help='Show the software license and exit.')
 def license() -> None:
     """Show the software license and exit."""
     echo(__license__)
 
 
-@_debugpanel.command('poll', aliases=['po'], section=_AUID_COMMANDS, help='Cause nodes to poll AUs.')
+@debugpanel.command(aliases=['po'], section=_AUID_COMMANDS, help='Cause nodes to poll AUs.')
 @_auid_operation
-def _poll(cli: _DebugPanelCli, **kwargs) -> None:
+def poll(cli: _DebugPanelCli, **kwargs) -> None:
     """Cause nodes to poll AUs."""
     cli.dispatch(cli.poll, **kwargs)
 
 
-@_debugpanel.command('reload-config', aliases=['rc'], section=_NODE_COMMANDS, help='Cause nodes to reload their configuration.')
+@debugpanel.command(aliases=['rc'], section=_NODE_COMMANDS, help='Cause nodes to reload their configuration.')
 @_node_operation
-def _reload_config(cli: _DebugPanelCli, **kwargs) -> None:
+def reload_config(cli: _DebugPanelCli, **kwargs) -> None:
     """Cause nodes to reload their configuration."""
     cli.dispatch(cli.reload_config, **kwargs)
 
 
-@_debugpanel.command('reindex-metadata', aliases=['ri'], section=_AUID_COMMANDS, help='Cause nodes to reindex the metadata of AUs.')
+@debugpanel.command(aliases=['ri'], section=_AUID_COMMANDS, help='Cause nodes to reindex the metadata of AUs.')
 @_auid_operation
-def _reindex_metadata(cli: _DebugPanelCli, **kwargs) -> None:
+def reindex_metadata(cli: _DebugPanelCli, **kwargs) -> None:
     """Cause nodes to reindex the metadata of AUs."""
     cli.dispatch(cli.reindex_metadata, **kwargs)
 
 
-@_debugpanel.command('validate-files', aliases=['vf'], section=_AUID_COMMANDS, help='Cause nodes to validate the files of AUs.')
+@debugpanel.command(aliases=['vf'], section=_AUID_COMMANDS, help='Cause nodes to validate the files of AUs.')
 @_auid_operation
-def _validate_files(cli: _DebugPanelCli, **kwargs) -> None:
+def validate_files(cli: _DebugPanelCli, **kwargs) -> None:
     """Cause nodes to validate the files of AUs."""
     cli.dispatch(cli.validate_files, **kwargs)
 
 
-@_debugpanel.command('version', help='Show the version number and exit.')
+@debugpanel.command('version', help='Show the version number and exit.')
 def version() -> None:
     """Show the version number and exit."""
     echo(__version__)
@@ -421,9 +438,4 @@ def version() -> None:
 
 def main() -> None:
     """Main entry point of the module."""
-    _debugpanel()
-
-
-# Main entry point of the module.
-if __name__ == '__main__':
-    main()
+    debugpanel()

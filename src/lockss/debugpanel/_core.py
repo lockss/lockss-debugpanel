@@ -34,59 +34,165 @@ from typing import Any, Optional, TypeAlias
 from urllib.request import Request, urlopen
 
 from lockss.pybasic.errorutil import InternalError
-from lockss.pybasic.nodeutil import NodeSpec, NodeTypeEnum
+from lockss.pybasic.nodeutil import NodeIdentifier, NodeSpec, NodeTypeEnum
 
 
+#: A type alias for what ``urllib.request.urlopen`` returns.
 UrlOpenT: TypeAlias = Any
 
 
+#: A default depth for the deep crawl operation.
 DEFAULT_DEPTH: int = 123
 
 
 class _DebugPanelAdapter(ABC):
+    """
+    Abstract base class for DebugPanel servlet clients.
+    """
 
     @abstractmethod
     def authenticate(self, u: str, p: str) -> _DebugPanelAdapter:
+        """
+        Stores authentication information for this node.
+
+        :param u: The UI username.
+        :type u: str
+        :param p: The UI password.
+        :type p: str
+        :return: This instance, for chaining.
+        :rtype: _DebugPanelAdapter
+        """
         raise NotImplementedError
 
     @abstractmethod
     def check_substance(self, auid: str) -> UrlOpenT:
+        """
+        Performs the DebugPanel servlet "Check Substance" operation on this node
+        for the given AUID.
+
+        :param auid: An AUID.
+        :type auid: str
+        :return: The result of ``urllib.request.urlopen``.
+        :rtype: UrlOpenT
+        :raises Exception: Whatever ``urllib.request.urlopen`` might raise.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def crawl(self, auid: str) -> UrlOpenT:
+        """
+        Performs the DebugPanel servlet "Force Start Crawl" operation on this
+        node for the given AUID.
+
+        :param auid: An AUID.
+        :type auid: str
+        :return: The result of ``urllib.request.urlopen``.
+        :rtype: UrlOpenT
+        :raises Exception: Whatever ``urllib.request.urlopen`` might raise.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def crawl_plugins(self) -> UrlOpenT:
+        """
+        Performs the DebugPanel servlet "Crawl Plugins" operation on this node.
+
+        :return: The result of ``urllib.request.urlopen``.
+        :rtype: UrlOpenT
+        :raises Exception: Whatever ``urllib.request.urlopen`` might raise.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def deep_crawl(self, auid: str, depth: int = DEFAULT_DEPTH) -> UrlOpenT:
+        """
+        Performs the DebugPanel servlet "Force Deep Crawl" operation on this
+        node for the given AUID, with the given depth (default
+        ``DEFAULT_DEPTH``).
+
+        :param auid: An AUID.
+        :type auid: str
+        :param depth: A strictly positive refetch depth.
+        :type auid: int
+        :return: The result of ``urllib.request.urlopen``.
+        :rtype: UrlOpenT
+        :raises ValueError: If depth is negative or zero.
+        :raises Exception: Whatever ``urllib.request.urlopen`` might raise.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def disable_indexing(self, auid: str) -> UrlOpenT:
+        """
+        Performs the DebugPanel servlet "Disable Indexing" operation on this
+        node for the given AUID.
+
+        :param auid: An AUID.
+        :type auid: str
+        :return: The result of ``urllib.request.urlopen``.
+        :rtype: UrlOpenT
+        :raises Exception: Whatever ``urllib.request.urlopen`` might raise.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def poll(self, auid: str) -> UrlOpenT:
+        """
+        Performs the DebugPanel servlet "Start V3 Poll" operation on this node
+        for the given AUID.
+
+        :param auid: An AUID.
+        :type auid: str
+        :return: The result of ``urllib.request.urlopen``.
+        :rtype: UrlOpenT
+        :raises Exception: Whatever ``urllib.request.urlopen`` might raise.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def reindex_metadata(self, auid: str) -> UrlOpenT:
+        """
+        Performs the DebugPanel servlet "Force Reindex Metadata" operation on
+        this node for the given AUID.
+
+        :param auid: An AUID.
+        :type auid: str
+        :return: The result of ``urllib.request.urlopen``.
+        :rtype: UrlOpenT
+        :raises Exception: Whatever ``urllib.request.urlopen`` might raise.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def reload_config(self) -> UrlOpenT:
+        """
+        Performs the DebugPanel servlet "Reload Config" operation on this node.
+
+        :return: The result of ``urllib.request.urlopen``.
+        :rtype: UrlOpenT
+        :raises Exception: Whatever ``urllib.request.urlopen`` might raise.
+        """
         raise NotImplementedError
 
     @abstractmethod
     def validate_files(self, auid: str) -> UrlOpenT:
+        """
+        Performs the DebugPanel servlet "Validate Files" operation on this node
+        for the given AUID.
+
+        :param auid: An AUID.
+        :type auid: str
+        :return: The result of ``urllib.request.urlopen``.
+        :rtype: UrlOpenT
+        :raises Exception: Whatever ``urllib.request.urlopen`` might raise.
+        """
         raise NotImplementedError
 
 
 class _DebugPanelAdapter1(_DebugPanelAdapter):
+    """
+    _DebugPAnelAdapter implementation for LOCKSS 1.x.
+    """
 
     def __init__(self, client: DebugPanelClient) -> None:
         super().__init__()
@@ -189,6 +295,10 @@ class _DebugPanelAdapter1(_DebugPanelAdapter):
 
 
 class _DebugPanelAdapter2(_DebugPanelAdapter):
+    """
+    _DebugPAnelAdapter implementation for LOCKSS 2.x, which raises
+    ``NotImplementedError`` for everything.
+    """
 
     def authenticate(self, u: str, p: str) -> _DebugPanelAdapter2:
         raise NotImplementedError
@@ -222,6 +332,9 @@ class _DebugPanelAdapter2(_DebugPanelAdapter):
 
 
 class DebugPanelClient(_DebugPanelAdapter):
+    """
+    A DebugPanel servlet client for either LOCKSS 1.x or 2.x.
+    """
 
     def __init__(self, node_spec: NodeSpec):
         self._node_spec: NodeSpec = node_spec
@@ -252,7 +365,22 @@ class DebugPanelClient(_DebugPanelAdapter):
     def disable_indexing(self, auid: str) -> UrlOpenT:
         return self._adapter.disable_indexing(auid)
 
+    def get_id(self) -> NodeIdentifier:
+        """
+        Returns this client's node identifier, from the node spec.
+
+        :return: This client's node identifier.
+        :rtype: NodeIdentifier
+        """
+        return self.get_node_spec().id
+
     def get_node_spec(self) -> NodeSpec:
+        """
+        Returns this client's node spec.
+
+        :return: This client's node spec.
+        :rtype: NodeSpec
+        """
         return self._node_spec.model_copy()
 
     def poll(self, auid: str) -> UrlOpenT:
