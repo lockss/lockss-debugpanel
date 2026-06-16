@@ -340,30 +340,30 @@ class DebugPanelClient(_DebugPanelClientInterface):
         self._node_spec: NodeSpec = node_spec
         match typ := node_spec.type:
             case NodeTypeEnum.V1.value:
-                self._adapter: _DebugPanelClientInterface = _DebugPanelClient1(self)
+                self._impl: _DebugPanelClientInterface = _DebugPanelClient1(self)
             case NodeTypeEnum.V2.value:
-                self._adapter: _DebugPanelClientInterface = _DebugPanelClient2()
+                self._impl: _DebugPanelClientInterface = _DebugPanelClient2()
             case _:
                 raise InternalError from ValueError(typ)
 
     def authenticate(self, u: str, p: str) -> DebugPanelClient:
-        self._adapter.authenticate(u, p)
+        self._impl.authenticate(u, p)
         return self
 
     def check_substance(self, auid: str) -> UrlOpenT:
-        return self._adapter.check_substance(auid)
+        return self._impl.check_substance(auid)
 
     def crawl(self, auid: str) -> UrlOpenT:
-        return self._adapter.crawl(auid)
+        return self._impl.crawl(auid)
 
     def crawl_plugins(self) -> UrlOpenT:
-        return self._adapter.crawl_plugins()
+        return self._impl.crawl_plugins()
 
     def deep_crawl(self, auid: str, depth: int = DEFAULT_DEPTH) -> UrlOpenT:
-        return self._adapter.deep_crawl(auid, depth=depth)
+        return self._impl.deep_crawl(auid, depth=depth)
 
     def disable_indexing(self, auid: str) -> UrlOpenT:
-        return self._adapter.disable_indexing(auid)
+        return self._impl.disable_indexing(auid)
 
     def get_id(self) -> NodeIdentifier:
         """
@@ -384,13 +384,13 @@ class DebugPanelClient(_DebugPanelClientInterface):
         return self._node_spec.model_copy()
 
     def poll(self, auid: str) -> UrlOpenT:
-        return self._adapter.poll(auid)
+        return self._impl.poll(auid)
 
     def reindex_metadata(self, auid: str) -> UrlOpenT:
-        return self._adapter.reindex_metadata(auid)
+        return self._impl.reindex_metadata(auid)
 
     def reload_config(self) -> UrlOpenT:
-        return self._adapter.reload_config()
+        return self._impl.reload_config()
 
     def validate_files(self, auid: str) -> UrlOpenT:
-        return self._adapter.validate_files(auid)
+        return self._impl.validate_files(auid)
