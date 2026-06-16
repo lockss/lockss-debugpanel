@@ -269,7 +269,7 @@ class _DebugPanelClient1(_DebugPanelClientInterface):
         """
         for key, val in kwargs.items():
             query = f'{query}&{key}={val}'
-        url: str = f'{(ns := self._client._node_spec).protocol.value}://{ns.host}:{ns.ui}/DebugPanel?{query}'
+        url: str = f'{(ns := self._client.get_node_spec()).protocol.value}://{ns.host}:{ns.ui}/DebugPanel?{query}'
         req: Request = Request(url)
         req.add_header('Authorization', f'Basic {self._basic}')
         return req
