@@ -30,12 +30,12 @@
 
 from unittest import TestCase
 
-from lockss.debugpanel._core import _DebugPanelAdapter, _DebugPanelAdapter2
+from lockss.debugpanel._core import _DebugPanelClientInterface, _DebugPanelClient2
 
 class TestCore(TestCase):
 
     def test_failing_adapters(self) -> None:
-        def _test_failing_adapter(a: _DebugPanelAdapter) -> None:
+        def _test_failing_adapter(a: _DebugPanelClientInterface) -> None:
             self.assertRaises(NotImplementedError, lambda: a.authenticate(None, None))
             self.assertRaises(NotImplementedError, lambda: a.check_substance(None))
             self.assertRaises(NotImplementedError, lambda: a.crawl(None))
@@ -46,4 +46,4 @@ class TestCore(TestCase):
             self.assertRaises(NotImplementedError, lambda: a.reindex_metadata(None))
             self.assertRaises(NotImplementedError, lambda: a.reload_config())
             self.assertRaises(NotImplementedError, lambda: a.validate_files(None))
-        _test_failing_adapter(_DebugPanelAdapter2())
+        _test_failing_adapter(_DebugPanelClient2())

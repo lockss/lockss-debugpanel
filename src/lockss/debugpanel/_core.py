@@ -45,13 +45,13 @@ UrlOpenT: TypeAlias = Any
 DEFAULT_DEPTH: int = 123
 
 
-class _DebugPanelAdapter(ABC):
+class _DebugPanelClientInterface(ABC):
     """
     Abstract base class for DebugPanel servlet clients.
     """
 
     @abstractmethod
-    def authenticate(self, u: str, p: str) -> _DebugPanelAdapter:
+    def authenticate(self, u: str, p: str) -> _DebugPanelClientInterface:
         """
         Stores authentication information for this node.
 
@@ -60,7 +60,7 @@ class _DebugPanelAdapter(ABC):
         :param p: The UI password.
         :type p: str
         :return: This instance, for chaining.
-        :rtype: _DebugPanelAdapter
+        :rtype: _DebugPanelClientInterface
         """
         raise NotImplementedError
 
@@ -189,7 +189,7 @@ class _DebugPanelAdapter(ABC):
         raise NotImplementedError
 
 
-class _DebugPanelAdapter1(_DebugPanelAdapter):
+class _DebugPanelClient1(_DebugPanelClientInterface):
     """
     _DebugPAnelAdapter implementation for LOCKSS 1.x.
     """
@@ -199,7 +199,7 @@ class _DebugPanelAdapter1(_DebugPanelAdapter):
         self._client: DebugPanelClient = client
         self._basic: Optional[str] = None
 
-    def authenticate(self, u: str, p: str) -> _DebugPanelAdapter1:
+    def authenticate(self, u: str, p: str) -> _DebugPanelClient1:
         self._basic: str = b64encode(f'{u}:{p}'.encode('utf-8')).decode('utf-8')
         return self
 
@@ -294,13 +294,13 @@ class _DebugPanelAdapter1(_DebugPanelAdapter):
         return urlopen(req)
 
 
-class _DebugPanelAdapter2(_DebugPanelAdapter):
+class _DebugPanelClient2(_DebugPanelClientInterface):
     """
     _DebugPAnelAdapter implementation for LOCKSS 2.x, which raises
     ``NotImplementedError`` for everything.
     """
 
-    def authenticate(self, u: str, p: str) -> _DebugPanelAdapter2:
+    def authenticate(self, u: str, p: str) -> _DebugPanelClient2:
         raise NotImplementedError
 
     def check_substance(self, auid: str) -> UrlOpenT:
@@ -331,7 +331,7 @@ class _DebugPanelAdapter2(_DebugPanelAdapter):
         raise NotImplementedError
 
 
-class DebugPanelClient(_DebugPanelAdapter):
+class DebugPanelClient(_DebugPanelClientInterface):
     """
     A DebugPanel servlet client for either LOCKSS 1.x or 2.x.
     """
@@ -340,9 +340,9 @@ class DebugPanelClient(_DebugPanelAdapter):
         self._node_spec: NodeSpec = node_spec
         match typ := node_spec.type:
             case NodeTypeEnum.V1.value:
-                self._adapter: _DebugPanelAdapter = _DebugPanelAdapter1(self)
+                self._adapter: _DebugPanelClientInterface = _DebugPanelClient1(self)
             case NodeTypeEnum.V2.value:
-                self._adapter: _DebugPanelAdapter = _DebugPanelAdapter2()
+                self._adapter: _DebugPanelClientInterface = _DebugPanelClient2()
             case _:
                 raise InternalError from ValueError(typ)
 
