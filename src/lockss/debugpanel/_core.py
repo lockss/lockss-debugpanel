@@ -191,7 +191,7 @@ class _DebugPanelClientInterface(ABC):
 
 class _DebugPanelClient1(_DebugPanelClientInterface):
     """
-    _DebugPAnelAdapter implementation for LOCKSS 1.x.
+    _DebugPanelAdapter implementation for LOCKSS 1.x.
     """
 
     def __init__(self, client: DebugPanelClient) -> None:
@@ -296,7 +296,7 @@ class _DebugPanelClient1(_DebugPanelClientInterface):
 
 class _DebugPanelClient2(_DebugPanelClientInterface):
     """
-    _DebugPAnelAdapter implementation for LOCKSS 2.x, which raises
+    _DebugPanelAdapter implementation for LOCKSS 2.x, which raises
     ``NotImplementedError`` for everything.
     """
 

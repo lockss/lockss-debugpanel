@@ -43,7 +43,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Optional, TypeAlias
 
-from click_extra import ExtraContext, Section, accessible_option, color_option, context, echo, group, jobs_option, option, option_group, pass_context, pass_obj, print_sorted_table, progressbar, prompt, show_params_option, table_format_option, timer_option
+from click_extra import ExtraContext, Section, accessible_option, color_option, echo, group, jobs_option, option, option_group, pass_context, pass_obj, print_sorted_table, progressbar, prompt, show_params_option, table_format_option, timer_option
 from click_extra.execution import DEFAULT_JOBS
 from click_plugins import with_plugins
 from cloup.constraints import mutually_exclusive
@@ -102,7 +102,7 @@ class _DebugPanelCli(object):
         theme: Optional[str] = None
         time: Optional[bool] = None
 
-    def __init__(self, ctx: ExtraContext):
+    def __init__(self, ctx: ExtraContext) -> None:
         """
         Constructor.
 
@@ -113,9 +113,8 @@ class _DebugPanelCli(object):
         self._ctx: ExtraContext = ctx
         self._opts: Optional[_DebugPanelCli._Opts] = None
         self._auids: Optional[list[str]] = None
-        self._executor: Optional[Executor] = None
-        self._nodes: Optional[list[str]] = None
         self._clients: list[DebugPanelClient] = list()
+        self._executor: Optional[Executor] = None
 
     def check_substance(self) -> None:
         """Implementation of the ``check-substance`` command."""
@@ -268,7 +267,7 @@ class _DebugPanelCli(object):
         if len(clients) == 0:
             self._ctx.fail('The list of nodes to process is empty')
         # Then, initialize the thread pool
-        self._executor = ThreadPoolExecutor(max_workers=opts.pool_size or self._ctx.meta[context.JOBS])
+        self._executor = ThreadPoolExecutor(max_workers=opts.pool_size or opts.jobs)
         # Finally, authenticate
         u, opts.username = opts.username if opts.username else prompt('UI username'), None
         p, opts.password = opts.password if opts.password else prompt('UI password', hide_input=True), None
@@ -363,7 +362,7 @@ def check_substance(cli: _DebugPanelCli, **kwargs) -> None:
 
 
 @debugpanel.command(help='Show the copyright and exit.')
-def copyright() -> None:
+def copyright(cli: _DebugPanelCli, **kwargs) -> None:
     """Show the copyright and exit."""
     echo(__copyright__)
 
@@ -397,7 +396,7 @@ def disable_indexing(cli: _DebugPanelCli, **kwargs) -> None:
 
 
 @debugpanel.command(help='Show the software license and exit.')
-def license() -> None:
+def license(cli: _DebugPanelCli, **kwargs) -> None:
     """Show the software license and exit."""
     echo(__license__)
 
@@ -431,7 +430,7 @@ def validate_files(cli: _DebugPanelCli, **kwargs) -> None:
 
 
 @debugpanel.command('version', help='Show the version number and exit.')
-def version() -> None:
+def version(cli: _DebugPanelCli, **kwargs) -> None:
     """Show the version number and exit."""
     echo(__version__)
 

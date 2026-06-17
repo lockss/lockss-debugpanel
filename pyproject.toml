@@ -45,7 +45,7 @@ dependencies = [
     "click-plugins (>=1.1.1.2,<1.2.0)",
     "cloup (>=3.0.7)", # from Click Extra 7.18.0
     "lockss-pybasic (==0.3.0-dev9)",
-    "pydantic (>=2.13.0,<2.14.0)", # from lockss-pybasic 0.3.0-dev6
+    "pydantic (>=2.13.0,<2.14.0)", # from lockss-pybasic 0.3.0-dev9
     "PyYAML (>=6.0.0,<6.1.0)",
 ]
 classifiers = [
