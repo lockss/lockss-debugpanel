@@ -291,7 +291,7 @@ _depth_option_group = option_group(
 )
 
 
-#: The node option group: --node/-n, --nodes/-N, --node-set/-s, --username/-U, --password/-P
+#: The node option group: --node-set/-s, --node-spec/-n, --node-specs/-N, --username/-U, --password/-P
 _node_option_group = option_group(
     'Node options',
     option('--node-set', '-s', metavar='FILE', type=click_path('ferz'), multiple=True, help='Add the nodes from the node set in FILE to the list of nodes to process.'),
@@ -302,7 +302,7 @@ _node_option_group = option_group(
 )
 
 
-#: The tabular output option group: --headings/--no-headings, --progress/--no-progress, --table-format/-T
+#: The tabular output option group: --headings/--no-headings, --table-format/-T
 _tabular_output_option_group = option_group(
     'Tabular output options',
     option('--headings/--no-headings', is_flag=True, default=True, help='Set whether to include column headings in tabular output.'),
@@ -319,7 +319,7 @@ _job_option_group = option_group(
 )
 
 
-#: The display option group: --progress/--no-progress
+#: The display option group: --accessible, --color/--no-color, --ansi/--no-ansi, --progress/--no-progress, --time
 _display_option_group = option_group(
     'Display options',
     accessible_option(expose_value=True),
