@@ -28,7 +28,7 @@
 
 [project]
 name = "lockss-debugpanel"
-version = "0.10.0-dev1" # Always change in __init__.py, and at release time in README.rst and CHANGELOG.rst
+version = "0.10.0-dev2" # Always change in __init__.py, and at release time in README.rst and CHANGELOG.rst
 description = "Command line tool and Python library to interact with the LOCKSS 1.x DebugPanel servlet"
 license = { text = "BSD-3-Clause" }
 readme = "README.rst"
@@ -41,11 +41,11 @@ maintainers = [
 ]
 dependencies = [
     "click-command-tree (>=1.2.0,<1.3.0)",
-    "click-extra[pygments] (>=7.18.0,<7.19.0)",
+    "click-extra[hjson,toml,xml,yaml] (>=8.1.1,<8.2.0)",
     "click-plugins (>=1.1.1.2,<1.2.0)",
-    "cloup (>=3.0.7)", # from Click Extra 7.18.0
-    "lockss-pybasic (==0.3.0-dev9)",
-    "pydantic (>=2.13.0,<2.14.0)", # from lockss-pybasic 0.3.0-dev9
+    "cloup (>=3.0.7)", # from Click Extra 8.2.1
+    "lockss-pybasic (==0.3.0-dev11)",
+    "pydantic (>=2.13.0,<2.14.0)", # from lockss-pybasic 0.3.0-dev11
     "PyYAML (>=6.0.0,<6.1.0)",
 ]
 classifiers = [
