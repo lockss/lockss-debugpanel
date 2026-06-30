@@ -39,8 +39,9 @@ from dataclasses import dataclass, field
 from importlib.metadata import entry_points
 from inspect import ismethod
 from itertools import chain
+from functools import wraps
 from pathlib import Path
-from typing import Any, Optional, TypeAlias
+from typing import Any, Optional, ParamSpec, TypeAlias, TypeVar
 
 from click_extra import Context, ProgressOption, Section, accessible_option, color_option, echo, group, jobs_option, no_color_option, option, option_group, pass_context, pass_obj, print_table, progressbar, prompt, show_params_option, table_format_option, timer_option
 from click_extra.context import JOBS, PROGRESS, TABLE_FORMAT
@@ -57,6 +58,8 @@ from lockss.pybasic.nodeutil import NodeIdentifier, NodeSet, get_node_spec_adapt
 from . import __copyright__, __license__, __version__
 from ._core import DebugPanelClient, UrlOpenT, DEFAULT_DEPTH
 
+_I = ParamSpec('_I')
+_O = TypeVar('_O')
 
 YamlT: TypeAlias = Any
 
@@ -149,6 +152,24 @@ class _DebugPanelCli(object):
     def validate_files(self) -> None:
         """Implementation of the ``validate-files`` command."""
         self._do_auid_command(DebugPanelClient.validate_files)
+
+    # DECORATOR
+    @staticmethod
+    def _command_decorator():
+        def decorator(method):
+            @wraps(method)
+            def decorated(self: _DebugPanelCli,
+                          func: Callable[_I, _O],
+                          init_list: Optional[list[Callable[[_DebugPanelCli], None]]] = None,
+                          **kwargs) -> None:
+                for init_func in init_list or []:
+                    init_func(self)
+                results: dict[tuple[_I], Future[_O]] = {}
+                with ThreadPoolExecutor(max_workers=(meta := self._ctx.meta)[JOBS]) as executor:
+                    futures: dict[Future[_O], tuple[DebugPanelClient, str]] = {executor.submit(func, client, auid, **kwargs): (client, auid) for auid in self._auids for client in self._clients}
+                    completed: Iterator[Future[UrlOpenT]] = as_completed(futures)
+        return decorator
+
 
     def _do_auid_command(self,
                          func_client_auid: Callable[[DebugPanelClient, str], UrlOpenT],
@@ -296,23 +317,30 @@ _job_option_group = option_group(
 )
 
 
-#: The display option group: --accessible, --color/--no-color --progress/--no-progress, --time
+#: The display option group: --accessible, --color, --no-color, --progress/--no-progress, --time
 _display_option_group = option_group(
     'Display options',
     accessible_option,
     color_option,
     no_color_option,
     progress_option,
+)
+
+
+#: The debug option group: --show-params, --time/--no-time
+_debug_option_group = option_group(
+    'Debug options',
+    show_params_option,
     timer_option
 )
 
 
 #: The composite AUID operation decorator.
-_auid_operation = compose_decorators(_node_option_group, _auid_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, pass_obj)
+_auid_operation = compose_decorators(_node_option_group, _auid_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, _debug_option_group, pass_obj)
 
 
 #: The composite node operation decorator.
-_node_operation = compose_decorators(_node_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, pass_obj)
+_node_operation = compose_decorators(_node_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, _debug_option_group, pass_obj)
 
 
 @with_plugins(entry_points(module='click_command_tree')) # adds a 'tree' command
@@ -379,7 +407,7 @@ def crawl(cli: _DebugPanelCli, **kwargs) -> None:
 
 
 @debugpanel.command(aliases=['dc'], section=_AUID_COMMANDS, help='Cause nodes to deep-crawl AUs.')
-@compose_decorators(_node_option_group, _auid_option_group, _depth_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, pass_obj)
+@compose_decorators(_node_option_group, _auid_option_group, _depth_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, _debug_option_group, pass_obj)
 def deep_crawl(cli: _DebugPanelCli, **kwargs) -> None:
     """Cause nodes to deep-crawl AUs"""
     cli.dispatch(cli.deep_crawl, **kwargs)
