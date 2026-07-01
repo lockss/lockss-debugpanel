@@ -32,7 +32,7 @@
 Command line tool to interact with the LOCKSS 1.x DebugPanel servlet.
 """
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from dataclasses import dataclass, field
@@ -41,7 +41,7 @@ from inspect import ismethod
 from itertools import chain
 from functools import wraps
 from pathlib import Path
-from typing import Any, Optional, ParamSpec, TypeAlias, TypeVar
+from typing import Any, Concatenate, Optional, ParamSpec, TypeAlias, TypeVar, Union
 
 from click_extra import Context, ProgressOption, Section, accessible_option, color_option, echo, group, jobs_option, no_color_option, option, option_group, pass_context, pass_obj, print_table, progressbar, prompt, show_params_option, table_format_option, timer_option
 from click_extra.context import JOBS, PROGRESS, TABLE_FORMAT
@@ -58,8 +58,12 @@ from lockss.pybasic.nodeutil import NodeIdentifier, NodeSet, get_node_spec_adapt
 from . import __copyright__, __license__, __version__
 from ._core import DebugPanelClient, UrlOpenT, DEFAULT_DEPTH
 
-_I = ParamSpec('_I')
-_O = TypeVar('_O')
+
+_A = TypeVar('_A')
+_B = TypeVar('_B')
+_K = TypeVar('_K')
+_R = TypeVar('_R')
+
 
 YamlT: TypeAlias = Any
 
@@ -153,23 +157,30 @@ class _DebugPanelCli(object):
         """Implementation of the ``validate-files`` command."""
         self._do_auid_command(DebugPanelClient.validate_files)
 
-    # DECORATOR
-    @staticmethod
-    def _command_decorator():
-        def decorator(method):
-            @wraps(method)
-            def decorated(self: _DebugPanelCli,
-                          func: Callable[_I, _O],
-                          init_list: Optional[list[Callable[[_DebugPanelCli], None]]] = None,
-                          **kwargs) -> None:
-                for init_func in init_list or []:
-                    init_func(self)
-                results: dict[tuple[_I], Future[_O]] = {}
-                with ThreadPoolExecutor(max_workers=(meta := self._ctx.meta)[JOBS]) as executor:
-                    futures: dict[Future[_O], tuple[DebugPanelClient, str]] = {executor.submit(func, client, auid, **kwargs): (client, auid) for auid in self._auids for client in self._clients}
-                    completed: Iterator[Future[UrlOpenT]] = as_completed(futures)
-        return decorator
-
+    def _generic_action(self,
+                        func: Callable[Concatenate[_A, dict[str, Any]], _B],
+                        tuples: Iterable[tuple[_A, dict[str, Any]]], # FIXME _A might need to always be a tuple
+                        get_result: Callable[[Future[_B]], _R],
+                        init_funcs: Optional[list[Callable[[_DebugPanelCli], None]]] = None,
+                        transform_key: Optional[Callable[[_A], _K]] = None,
+                        progress_bar_item: Optional[Callable[[Optional[_A]], Optional[str]]] = None):
+        for init_func in init_funcs or []:
+            init_func(self)
+        results: dict[_K, Union[_R, Exception]] = {}
+        with ThreadPoolExecutor(max_workers=(meta := self._ctx.meta)[JOBS]) as executor:
+            futures: dict[Future[_B], _A] = {executor.submit(func, *a, **(k or {})): a for a, k in tuples}
+            completed: Iterator[Future[_B]] = as_completed(futures)
+            xform: Callable[[_A], _K] = transform_key or (lambda x: x)
+            itemlbl: Callable[[Optional[_A]], Optional[str]] = progress_bar_item or (lambda x: xform(x) or None)
+            with progressbar(completed, length=len(futures), label='Progress', item_show_func=itemlbl) if (meta := self._ctx.meta)[PROGRESS] else nullcontext(completed) as bar:
+                for future in bar:
+                    key = xform(futures[future])
+                    try:
+                        with future.result() as result: # FIXME: only works if result is a CM
+                            results[key] = get_result(result)
+                    except Exception as exc:
+                        results[key] = exc
+        # FIXME
 
     def _do_auid_command(self,
                          func_client_auid: Callable[[DebugPanelClient, str], UrlOpenT],
