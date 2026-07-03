@@ -189,15 +189,30 @@ class _DebugPanelClientInterface(ABC):
         raise NotImplementedError
 
 
-class _DebugPanelClient1(_DebugPanelClientInterface):
+class _BaseDebugPanelClient(_DebugPanelClientInterface):
+    """
+    Base _DebugPanelAdapter implementation.
+    """
+
+    _client: DebugPanelClient
+    _node_spec: NodeSpec
+
+    def __init__(self, client: DebugPanelClient, node_spec: NodeSpec) -> None:
+        super().__init__()
+        self._client = client
+        self._node_spec = node_spec
+
+
+class _DebugPanelClient1(_BaseDebugPanelClient):
     """
     _DebugPanelAdapter implementation for LOCKSS 1.x.
     """
 
-    def __init__(self, client: DebugPanelClient) -> None:
-        super().__init__()
-        self._client: DebugPanelClient = client
-        self._basic: Optional[str] = None
+    _basic: Optional[str]
+
+    def __init__(self, client: DebugPanelClient, node_spec: NodeSpec) -> None:
+        super().__init__(client, node_spec)
+        self._basic = None
 
     def authenticate(self, u: str, p: str) -> _DebugPanelClient1:
         self._basic: str = b64encode(f'{u}:{p}'.encode('utf-8')).decode('utf-8')
@@ -269,7 +284,7 @@ class _DebugPanelClient1(_DebugPanelClientInterface):
         """
         for key, val in kwargs.items():
             query = f'{query}&{key}={val}'
-        url: str = f'{(ns := self._client.get_node_spec()).protocol.value}://{ns.host}:{ns.ui}/DebugPanel?{query}'
+        url: str = f'{(ns := self._node_spec).protocol.value}://{ns.host}:{ns.ui}/DebugPanel?{query}'
         req: Request = Request(url)
         req.add_header('Authorization', f'Basic {self._basic}')
         return req
@@ -294,11 +309,14 @@ class _DebugPanelClient1(_DebugPanelClientInterface):
         return urlopen(req)
 
 
-class _DebugPanelClient2(_DebugPanelClientInterface):
+class _DebugPanelClient2(_BaseDebugPanelClient):
     """
     _DebugPanelAdapter implementation for LOCKSS 2.x, which raises
     ``NotImplementedError`` for everything.
     """
+
+    def __init__(self, client: DebugPanelClient, node_spec: NodeSpec) -> None:
+        super().__init__(client, node_spec)
 
     def authenticate(self, u: str, p: str) -> _DebugPanelClient2:
         raise NotImplementedError
@@ -331,18 +349,69 @@ class _DebugPanelClient2(_DebugPanelClientInterface):
         raise NotImplementedError
 
 
-class DebugPanelClient(_DebugPanelClientInterface):
+class _DebugPanelClient12Pair(_BaseDebugPanelClient):
     """
-    A DebugPanel servlet client for either LOCKSS 1.x or 2.x.
+    A DebugPanel servlet client for a LOCKSS 1.x/2.x migrating pair.
     """
 
+    _v1: _DebugPanelClient1
+    _v2: _DebugPanelClient2
+
+    def __init__(self, client: DebugPanelClient, node_spec: NodeSpec) -> None:
+        super().__init__(client, node_spec)
+        self._v1 = _DebugPanelClient1(client, node_spec.origin)
+        self._v2 = _DebugPanelClient2(client, node_spec.destination)
+
+    def authenticate(self, u: str, p: str) -> _DebugPanelClient12Pair:
+        self._v1.authenticate(u, p)
+        self._v2.authenticate(u, p)
+        return self
+
+    def check_substance(self, auid: str) -> UrlOpenT:
+        raise NotImplementedError
+
+    def crawl(self, auid: str) -> UrlOpenT:
+        raise NotImplementedError
+
+    def crawl_plugins(self) -> UrlOpenT:
+        raise NotImplementedError
+
+    def deep_crawl(self, auid: str, depth: int = DEFAULT_DEPTH) -> UrlOpenT:
+        raise NotImplementedError
+
+    def disable_indexing(self, auid: str) -> UrlOpenT:
+        raise NotImplementedError
+
+    def poll(self, auid: str) -> UrlOpenT:
+        raise NotImplementedError
+
+    def reindex_metadata(self, auid: str) -> UrlOpenT:
+        raise NotImplementedError
+
+    def reload_config(self) -> UrlOpenT:
+        raise NotImplementedError
+
+    def validate_files(self, auid: str) -> UrlOpenT:
+        raise NotImplementedError
+
+
+class DebugPanelClient(_DebugPanelClientInterface):
+    """
+    A DebugPanel servlet client.
+    """
+
+    _impl: _DebugPanelClientInterface
+    _node_spec: NodeSpec
+
     def __init__(self, node_spec: NodeSpec):
-        self._node_spec: NodeSpec = node_spec
+        self._node_spec = node_spec.model_copy()
         match typ := node_spec.type:
             case NodeTypeEnum.V1.value:
-                self._impl: _DebugPanelClientInterface = _DebugPanelClient1(self)
+                self._impl = _DebugPanelClient1(self, self._node_spec)
             case NodeTypeEnum.V2.value:
-                self._impl: _DebugPanelClientInterface = _DebugPanelClient2()
+                self._impl = _DebugPanelClient2(self, self._node_spec)
+            case NodeTypeEnum.V1_V2_MIGRATION_PAIR.value:
+                self._impl = _DebugPanelClient12Pair(self, self._node_spec)
             case _:
                 raise InternalError from ValueError(typ)
 
@@ -372,16 +441,7 @@ class DebugPanelClient(_DebugPanelClientInterface):
         :return: This client's node identifier.
         :rtype: NodeIdentifier
         """
-        return self.get_node_spec().id
-
-    def get_node_spec(self) -> NodeSpec:
-        """
-        Returns this client's node spec.
-
-        :return: This client's node spec.
-        :rtype: NodeSpec
-        """
-        return self._node_spec.model_copy()
+        return self._node_spec.id
 
     def poll(self, auid: str) -> UrlOpenT:
         return self._impl.poll(auid)

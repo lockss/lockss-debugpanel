@@ -41,7 +41,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any, Concatenate, Optional, ParamSpec, TypeAlias, TypeVar, Union
 
-from click_extra import Context, ProgressOption, Section, accessible_option, color_option, echo, group, jobs_option, no_color_option, option, option_group, pass_context, pass_obj, print_table, progressbar, prompt, show_params_option, table_format_option, timer_option
+from click_extra import Context, ProgressOption, Section, accessible_option, color_option, echo, group, jobs_option, no_color_option, option, option_group, pass_context, print_table, progressbar, prompt, show_params_option, table_format_option, timer_option
 from click_extra.context import JOBS, PROGRESS, TABLE_FORMAT
 from click_extra.decorators import decorator_factory
 from click_plugins import with_plugins

@@ -41,11 +41,11 @@ maintainers = [
 ]
 dependencies = [
     "click-command-tree (>=1.2.0,<1.3.0)",
-    "click-extra[hjson,toml,xml,yaml] (>=8.1.1,<8.2.0)",
+    "click-extra[hjson,toml,xml,yaml] (>=8.2.0,<8.3.0)",
     "click-plugins (>=1.1.1.2,<1.2.0)",
-    "cloup (>=3.0.7)", # from Click Extra 8.2.1
-    "lockss-pybasic (==0.3.0-dev11)",
-    "pydantic (>=2.13.0,<2.14.0)", # from lockss-pybasic 0.3.0-dev11
+    "cloup (>=3.0.7)", # from Click Extra 8.2.0
+    "lockss-pybasic (==0.3.0-dev13)",
+    "pydantic (>=2.13.0,<2.14.0)", # from lockss-pybasic 0.3.0-dev13
     "PyYAML (>=6.0.0,<6.1.0)",
 ]
 classifiers = [
