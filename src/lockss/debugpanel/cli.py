@@ -36,22 +36,19 @@ from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from contextlib import nullcontext
 from dataclasses import dataclass, field
-from importlib.metadata import entry_points
 from itertools import chain
 from pathlib import Path
 from typing import Any, Concatenate, Optional, ParamSpec, TypeAlias, TypeVar, Union
 
-from click_extra import Context, ProgressOption, Section, accessible_option, color_option, echo, group, jobs_option, no_color_option, option, option_group, pass_context, print_table, progressbar, prompt, show_params_option, table_format_option, timer_option
+from click_extra import Context, ProgressOption, Section, accessible_option, color_option, echo, group, jobs_option, no_color_option, option, option_group, pass_context, print_table, progressbar, prompt, show_params_option, table_format_option, timer_option, tree_option
 from click_extra.context import JOBS, PROGRESS, TABLE_FORMAT
 from click_extra.decorators import decorator_factory
-from click_plugins import with_plugins
 from pydantic import ValidationError
 import yaml
 
 from lockss.pybasic.cliutil import NonNegativeInt, click_path, compose_decorators
-from lockss.pybasic.errorutil import InternalError
 from lockss.pybasic.fileutil import file_lines
-from lockss.pybasic.nodeutil import NodeIdentifier, NodeSet, get_node_spec_adapter
+from lockss.pybasic.nodeutil import NodeSet, get_node_spec_adapter
 
 from . import __copyright__, __license__, __version__
 from ._core import DebugPanelClient, UrlOpenT, DEFAULT_DEPTH
@@ -147,48 +144,58 @@ class _DebugPanelCli(object):
                         get_result: Callable[[_OpResult], _ResultValue],
                         init_funcs: Optional[list[Callable[[], None]]] = None,
                         transform_key: Optional[Callable[[_OpInput], _ResultKey]] = None,
-                        progress_bar_item: Optional[Callable[[Optional[_OpInput]], Optional[str]]] = None):
+                        progress_bar_item: Optional[Callable[[Optional[_OpInput]], Optional[str]]] = None) \
+            -> dict[_ResultKey, _ResultValue]:
         for init_func in init_funcs or []:
             init_func()
-        results: dict[_ResultKey, Union[_ResultValue, Exception]] = {}
+        results: dict[_ResultKey, _ResultValue] = {}
         with ThreadPoolExecutor(max_workers=(meta := self._ctx.meta)[JOBS]) as executor:
             futures: dict[Future[_OpResult], _OpInput] = {executor.submit(func, *a, **(k or {})): a for a, k in get_tuples()}
             completed: Iterator[Future[_OpResult]] = as_completed(futures)
             xform: Callable[[_OpInput], _ResultKey] = transform_key or (lambda x: x)
             itemlbl: Callable[[Optional[_OpInput]], Optional[str]] = lambda f: (progress_bar_item if progress_bar_item else str)(futures[f]) if f else None
-            with progressbar(completed, length=len(futures), label='Progress', item_show_func=itemlbl) if (meta := self._ctx.meta)[PROGRESS] else nullcontext(completed) as bar:
+            with progressbar(completed, length=len(futures), label='Progress', item_show_func=itemlbl) if self._ctx.meta[PROGRESS] else nullcontext(completed) as bar:
                 for future in bar:
                     key: _ResultKey = xform(futures[future])
                     try:
                         results[key] = get_result(future.result())
                     except Exception as exc:
                         results[key] = str(exc)
-        from pprint import pprint
-        pprint(results) # FIXME
+        return results
 
     def _generic_auid_action(self,
                              func: Callable[Concatenate[tuple[DebugPanelClient, str], dict[str, Any]], UrlOpenT],
-                             **kwargs):
-        self._generic_action(func,
-                             lambda: [((client, auid), kwargs) for auid in self._auids for client in self._clients],
-                             self._process_urlopent,
-                             init_funcs=[self._initialize_node_operation, self._initialize_auid_operation, self._initialize_auth],
-                             transform_key=lambda t: (t[0].get_id(), t[1]),
-                             progress_bar_item=lambda t: f'{t[0].get_id()} {t[1]}' if t else None)
+                             **kwargs) -> None:
+        results: dict[tuple[str, str], str] = \
+            self._generic_action(func,
+                                 lambda: [((client, auid), kwargs) for auid in self._auids for client in self._clients],
+                                 self._process_urlopent,
+                                 init_funcs=[self._initialize_node_operation, self._initialize_auid_operation, self._initialize_auth],
+                                 transform_key=lambda t: (t[0].get_id(), t[1]),
+                                 progress_bar_item=lambda t: f'{t[0].get_id()} {t[1]}' if t else None)
+        sorted_nodes: list[str] = sorted(c.get_id() for c in self._clients)
+        sorted_auids: list[str] = sorted(self._auids)
+        print_table([[a, *[results[(n, a)] for n in sorted_nodes]] for a in sorted_auids],
+                    ['AUID', *sorted(n for n in sorted_nodes)],
+                    table_format=self._ctx.meta[TABLE_FORMAT])
 
     def _generic_node_action(self,
                              func: Callable[Concatenate[tuple[DebugPanelClient], dict[str, Any]], UrlOpenT],
-                             **kwargs):
-        self._generic_action(func,
-                             lambda: [((client,), kwargs) for client in self._clients],
-                             self._process_urlopent,
-                             init_funcs=[self._initialize_node_operation, self._initialize_auth],
-                             transform_key=lambda t: (t[0].get_id(),),
-                             progress_bar_item=lambda t: f'{t[0].get_id()}' if t else None)
+                             **kwargs) -> None:
+        results: dict[tuple[str], str] = \
+            self._generic_action(func,
+                                 lambda: [((client,), kwargs) for client in self._clients],
+                                 self._process_urlopent,
+                                 init_funcs=[self._initialize_node_operation, self._initialize_auth],
+                                 transform_key=lambda t: (t[0].get_id(),),
+                                 progress_bar_item=lambda t: f'{t[0].get_id()}' if t else None)
+        sorted_nodes: list[str] = sorted(c.get_id() for c in self._clients)
+        print_table([[n, str(results[(n,)])] for n in sorted_nodes],
+                    ['Node', 'Result'])
 
     def _initialize_auth(self) -> None:
         opts = self._opts
-        u, opts.username = opts.username if opts.username else prompt('UI username'), None
+        u = opts.username if opts.username else prompt('UI username')
         p, opts.password = opts.password if opts.password else prompt('UI password', hide_input=True), None
         for client in self._clients:
             client.authenticate(u, p)
@@ -301,10 +308,10 @@ _auid_operation = compose_decorators(_node_option_group, _auid_option_group, _jo
 _node_operation = compose_decorators(_node_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, _debug_option_group, pass_context)
 
 
-@with_plugins(entry_points(module='click_command_tree')) # adds a 'tree' command
 @group(params=None)
+@tree_option
 @pass_context
-def debugpanel(ctx: Context, **kwargs):
+def debugpanel(ctx: Context, **kwargs) -> None:
     """Command line tool to interact with the LOCKSS 1.x DebugPanel servlet."""
     pass
 
