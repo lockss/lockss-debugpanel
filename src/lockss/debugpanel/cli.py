@@ -170,7 +170,7 @@ class _DebugPanelCli(object):
             self._generic_action(func,
                                  lambda: [((client, auid), kwargs) for auid in self._auids for client in self._clients],
                                  self._process_urlopent,
-                                 init_funcs=[self._initialize_node_operation, self._initialize_auid_operation, self._initialize_auth],
+                                 init_funcs=[self._initialize_clients, self._initialize_auids, self._initialize_auth],
                                  transform_key=lambda t: (t[0].get_id(), t[1]),
                                  progress_bar_item=lambda t: f'{t[0].get_id()} {t[1]}' if t else None)
         sorted_nodes: list[str] = sorted(c.get_id() for c in self._clients)
@@ -186,37 +186,35 @@ class _DebugPanelCli(object):
             self._generic_action(func,
                                  lambda: [((client,), kwargs) for client in self._clients],
                                  self._process_urlopent,
-                                 init_funcs=[self._initialize_node_operation, self._initialize_auth],
+                                 init_funcs=[self._initialize_clients, self._initialize_auth],
                                  transform_key=lambda t: (t[0].get_id(),),
                                  progress_bar_item=lambda t: f'{t[0].get_id()}' if t else None)
         sorted_nodes: list[str] = sorted(c.get_id() for c in self._clients)
         print_table([[n, str(results[(n,)])] for n in sorted_nodes],
                     ['Node', 'Result'])
 
-    def _initialize_auth(self) -> None:
-        opts = self._opts
-        u = opts.username if opts.username else prompt('UI username')
-        p, opts.password = opts.password if opts.password else prompt('UI password', hide_input=True), None
-        for client in self._clients:
-            client.authenticate(u, p)
-
-    def _initialize_auid_operation(self) -> None:
+    def _initialize_auids(self) -> None:
         """
-        Initializes for an AUID-centric operation. Fails if the list of AUIDs
-        ends up being empty.
+        Initializes the list of AUIDs. Fails if the list of AUIDs ends up being
+        empty.
         """
         self._auids = [*(opts := self._opts).auid, *chain.from_iterable(file_lines(file_path) for file_path in opts.auids)]
         if len(self._auids) == 0:
             self._ctx.fail('The list of AUIDs to process is empty')
 
-    def _initialize_node_operation(self) -> None:
+    def _initialize_auth(self) -> None:
+        u = opts.username if (opts := self._opts).username else prompt('UI username')
+        p, opts.password = opts.password if opts.password else prompt('UI password', hide_input=True), None
+        for client in self._clients:
+            client.authenticate(u, p)
+
+    def _initialize_clients(self) -> None:
         """
-        Initializes for a node-centric operation. Fails if the list of nodes
-        ends up being empty.
+        Initializes the list of clients. Fails if the list of nodes ends up
+        being empty.
         """
-        # First, process the nodes...
         clients: list[DebugPanelClient] = list()
-        # ...first from node sets
+        # First from node sets
         for node_set_path in (opts := self._opts).node_set:
             with node_set_path.open('r') as node_set_input:
                 try:
@@ -226,12 +224,13 @@ class _DebugPanelCli(object):
                         clients.append(DebugPanelClient(node_spec))
                 except (yaml.YAMLError, ValidationError) as exc:
                     self._ctx.fail(str(exc))
-        # ...then from compact node specifications
+        # Then from compact node specifications
         for compact_node_spec in [*opts.node_spec, *chain.from_iterable(file_lines(file_path) for file_path in opts.node_specs)]:
             try:
                 clients.append(DebugPanelClient(get_node_spec_adapter().validate_python(compact_node_spec)))
             except ValidationError as exc:
                 self._ctx.fail(str(exc))
+        # Fail if empty
         if len(clients) == 0:
             self._ctx.fail('The list of nodes to process is empty')
         self._clients = clients
@@ -282,7 +281,7 @@ _job_option_group = option_group(
 )
 
 
-#: The display option group: --accessible, --color, --no-color, --progress/--no-progress, --progress/--no-progress
+#: The display option group: --accessible, --color, --no-color, --progress/--no-progress
 _display_option_group = option_group(
     'Display options',
     accessible_option,
@@ -312,25 +311,21 @@ _node_operation = compose_decorators(_node_option_group, _job_option_group, _tab
 @tree_option
 @pass_context
 def debugpanel(ctx: Context, **kwargs) -> None:
-    """Command line tool to interact with the LOCKSS 1.x DebugPanel servlet."""
     pass
 
 
 @debugpanel.command(help='Show the copyright and exit.')
 def copyright(**kwargs) -> None:
-    """Show the copyright and exit"""
     echo(__copyright__)
 
 
 @debugpanel.command(help='Show the software license and exit.')
 def license(**kwargs) -> None:
-    """Show the software license and exit"""
     echo(__license__)
 
 
 @debugpanel.command('version', help='Show the version number and exit.')
 def version(**kwargs) -> None:
-    """Show the version number and exit"""
     echo(__version__)
 
 
@@ -341,14 +336,12 @@ _NODE_COMMANDS = Section('Node commands')
 @debugpanel.command(aliases=['cp'], section=_NODE_COMMANDS, help='Cause nodes to crawl plugins.')
 @_node_operation
 def crawl_plugins(ctx: Context, **kwargs) -> None:
-    """Cause nodes to crawl plugins"""
     _DebugPanelCli(ctx, **kwargs).crawl_plugins()
 
 
 @debugpanel.command(aliases=['rc'], section=_NODE_COMMANDS, help='Cause nodes to reload their configuration.')
 @_node_operation
 def reload_config(ctx: Context, **kwargs) -> None:
-    """Cause nodes to reload their configuration"""
     _DebugPanelCli(ctx, **kwargs).reload_config()
 
 
@@ -359,49 +352,42 @@ _AUID_COMMANDS = Section('AUID commands')
 @debugpanel.command(aliases=['cs'], section=_AUID_COMMANDS, help='Cause nodes to check the substance of AUs.')
 @_auid_operation
 def check_substance(ctx: Context, **kwargs) -> None:
-    """Cause nodes to check the substance of AUs"""
     _DebugPanelCli(ctx, **kwargs).check_substance()
 
 
 @debugpanel.command(aliases=['cr'], section=_AUID_COMMANDS, help='Cause nodes to crawl AUs.')
 @_auid_operation
 def crawl(ctx: Context, **kwargs) -> None:
-    """Cause nodes to crawl AUs"""
     _DebugPanelCli(ctx, **kwargs).crawl()
 
 
 @debugpanel.command(aliases=['dc'], section=_AUID_COMMANDS, help='Cause nodes to deep-crawl AUs.')
 @compose_decorators(_node_option_group, _auid_option_group, _depth_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, _debug_option_group, pass_context)
 def deep_crawl(ctx: Context, **kwargs) -> None:
-    """Cause nodes to deep-crawl AUs"""
     _DebugPanelCli(ctx, **kwargs).deep_crawl()
 
 
 @debugpanel.command(aliases=['di'], section=_AUID_COMMANDS, help='Cause nodes to disable metadata indexing for AUs.')
 @_auid_operation
 def disable_indexing(ctx: Context, **kwargs) -> None:
-    """Cause nodes to disable metadata indexing for AUs"""
     _DebugPanelCli(ctx, **kwargs).disable_indexing()
 
 
 @debugpanel.command(aliases=['po'], section=_AUID_COMMANDS, help='Cause nodes to poll AUs.')
 @_auid_operation
 def poll(ctx: Context, **kwargs) -> None:
-    """Cause nodes to poll AUs"""
     _DebugPanelCli(ctx, **kwargs).poll()
 
 
 @debugpanel.command(aliases=['ri'], section=_AUID_COMMANDS, help='Cause nodes to reindex the metadata of AUs.')
 @_auid_operation
 def reindex_metadata(ctx: Context, **kwargs) -> None:
-    """Cause nodes to reindex the metadata of AUs"""
     _DebugPanelCli(ctx, **kwargs).reindex_metadata()
 
 
 @debugpanel.command(aliases=['vf'], section=_AUID_COMMANDS, help='Cause nodes to validate the files of AUs.')
 @_auid_operation
 def validate_files(ctx: Context, **kwargs) -> None:
-    """Cause nodes to validate the files of AUs"""
     _DebugPanelCli(ctx, **kwargs).validate_files()
 
 
