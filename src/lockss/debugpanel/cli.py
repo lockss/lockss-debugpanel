@@ -299,14 +299,6 @@ _debug_option_group = option_group(
 )
 
 
-#: The composite AUID operation decorator.
-_auid_operation = compose_decorators(_node_option_group, _auid_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, _debug_option_group, pass_context)
-
-
-#: The composite node operation decorator.
-_node_operation = compose_decorators(_node_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, _debug_option_group, pass_context)
-
-
 @group(params=None)
 @tree_option
 @pass_context
@@ -314,19 +306,30 @@ def debugpanel(ctx: Context, **kwargs) -> None:
     pass
 
 
+#: The composite top-level command decorator
+_top_level_command = compose_decorators(_debug_option_group, pass_context)
+
+
 @debugpanel.command(help='Show the copyright and exit.')
-def copyright(**kwargs) -> None:
+@_top_level_command
+def copyright(ctx: Context, **kwargs) -> None:
     echo(__copyright__)
 
 
 @debugpanel.command(help='Show the software license and exit.')
-def license(**kwargs) -> None:
+@_top_level_command
+def license(ctx: Context, **kwargs) -> None:
     echo(__license__)
 
 
 @debugpanel.command('version', help='Show the version number and exit.')
-def version(**kwargs) -> None:
+@_top_level_command
+def version(ctx: Context, **kwargs) -> None:
     echo(__version__)
+
+
+#: The composite node command decorator.
+_node_command = compose_decorators(_node_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, _debug_option_group, pass_context)
 
 
 #: A subcommand section for node commands.
@@ -334,15 +337,19 @@ _NODE_COMMANDS = Section('Node commands')
 
 
 @debugpanel.command(aliases=['cp'], section=_NODE_COMMANDS, help='Cause nodes to crawl plugins.')
-@_node_operation
+@_node_command
 def crawl_plugins(ctx: Context, **kwargs) -> None:
     _DebugPanelCli(ctx, **kwargs).crawl_plugins()
 
 
 @debugpanel.command(aliases=['rc'], section=_NODE_COMMANDS, help='Cause nodes to reload their configuration.')
-@_node_operation
+@_node_command
 def reload_config(ctx: Context, **kwargs) -> None:
     _DebugPanelCli(ctx, **kwargs).reload_config()
+
+
+#: The composite AUID command decorator.
+_auid_command = compose_decorators(_node_option_group, _auid_option_group, _job_option_group, _tabular_output_option_group, _display_option_group, _debug_option_group, pass_context)
 
 
 #: A subcommand section for AUID commands.
@@ -350,13 +357,13 @@ _AUID_COMMANDS = Section('AUID commands')
 
 
 @debugpanel.command(aliases=['cs'], section=_AUID_COMMANDS, help='Cause nodes to check the substance of AUs.')
-@_auid_operation
+@_auid_command
 def check_substance(ctx: Context, **kwargs) -> None:
     _DebugPanelCli(ctx, **kwargs).check_substance()
 
 
 @debugpanel.command(aliases=['cr'], section=_AUID_COMMANDS, help='Cause nodes to crawl AUs.')
-@_auid_operation
+@_auid_command
 def crawl(ctx: Context, **kwargs) -> None:
     _DebugPanelCli(ctx, **kwargs).crawl()
 
@@ -368,25 +375,25 @@ def deep_crawl(ctx: Context, **kwargs) -> None:
 
 
 @debugpanel.command(aliases=['di'], section=_AUID_COMMANDS, help='Cause nodes to disable metadata indexing for AUs.')
-@_auid_operation
+@_auid_command
 def disable_indexing(ctx: Context, **kwargs) -> None:
     _DebugPanelCli(ctx, **kwargs).disable_indexing()
 
 
 @debugpanel.command(aliases=['po'], section=_AUID_COMMANDS, help='Cause nodes to poll AUs.')
-@_auid_operation
+@_auid_command
 def poll(ctx: Context, **kwargs) -> None:
     _DebugPanelCli(ctx, **kwargs).poll()
 
 
 @debugpanel.command(aliases=['ri'], section=_AUID_COMMANDS, help='Cause nodes to reindex the metadata of AUs.')
-@_auid_operation
+@_auid_command
 def reindex_metadata(ctx: Context, **kwargs) -> None:
     _DebugPanelCli(ctx, **kwargs).reindex_metadata()
 
 
 @debugpanel.command(aliases=['vf'], section=_AUID_COMMANDS, help='Cause nodes to validate the files of AUs.')
-@_auid_operation
+@_auid_command
 def validate_files(ctx: Context, **kwargs) -> None:
     _DebugPanelCli(ctx, **kwargs).validate_files()
 
