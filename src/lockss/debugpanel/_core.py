@@ -30,12 +30,11 @@
 
 from abc import ABC, abstractmethod
 from base64 import b64encode
-from typing import Any, Optional, TypeAlias
+from typing import Any, Optional, TypeAlias, cast
 from urllib.request import Request, urlopen
 
 from lockss.pybasic.errorutil import InternalError
-from lockss.pybasic.nodeutil import NodeIdentifier, NodeSpec, NodeTypeEnum
-
+from lockss.pybasic.nodeutil import NodeIdentifier, NodeSpec, NodeSpec1, NodeSpec2, NodeTypeEnum, NodeSpec12Pair
 
 #: A type alias for what ``urllib.request.urlopen`` returns.
 UrlOpenT: TypeAlias = Any
@@ -189,33 +188,22 @@ class _DebugPanelClientInterface(ABC):
         raise NotImplementedError
 
 
-class _BaseDebugPanelClient(_DebugPanelClientInterface):
+class _DebugPanelClient1(_DebugPanelClientInterface):
     """
-    Base _DebugPanelAdapter implementation.
+    A DebugPanel servlet client for LOCKSS 1.x.
     """
 
     _client: DebugPanelClient
-    _node_spec: NodeSpec
-
-    def __init__(self, client: DebugPanelClient, node_spec: NodeSpec) -> None:
-        super().__init__()
-        self._client = client
-        self._node_spec = node_spec
-
-
-class _DebugPanelClient1(_BaseDebugPanelClient):
-    """
-    _DebugPanelAdapter implementation for LOCKSS 1.x.
-    """
-
+    _node_spec: NodeSpec1
     _basic: Optional[str]
 
-    def __init__(self, client: DebugPanelClient, node_spec: NodeSpec) -> None:
-        super().__init__(client, node_spec)
+    def __init__(self, client: DebugPanelClient, node_spec: NodeSpec1) -> None:
+        self._client = client
+        self._node_spec = node_spec
         self._basic = None
 
     def authenticate(self, u: str, p: str) -> _DebugPanelClient1:
-        self._basic: str = b64encode(f'{u}:{p}'.encode('utf-8')).decode('utf-8')
+        self._basic = b64encode(f'{u}:{p}'.encode('utf-8')).decode('utf-8')
         return self
 
     def check_substance(self, auid: str) -> UrlOpenT:
@@ -284,7 +272,7 @@ class _DebugPanelClient1(_BaseDebugPanelClient):
         """
         for key, val in kwargs.items():
             query = f'{query}&{key}={val}'
-        url: str = f'{(ns := self._node_spec).protocol.value}://{ns.host}:{ns.ui}/DebugPanel?{query}'
+        url: str = f'{self._node_spec.get_host()}/DebugPanel?{query}'
         req: Request = Request(url)
         req.add_header('Authorization', f'Basic {self._basic}')
         return req
@@ -309,14 +297,17 @@ class _DebugPanelClient1(_BaseDebugPanelClient):
         return urlopen(req)
 
 
-class _DebugPanelClient2(_BaseDebugPanelClient):
+class _DebugPanelClient2(_DebugPanelClientInterface):
     """
-    _DebugPanelAdapter implementation for LOCKSS 2.x, which raises
-    ``NotImplementedError`` for everything.
+    A DebugPanel servlet client for LOCKSS 2.x.
     """
 
-    def __init__(self, client: DebugPanelClient, node_spec: NodeSpec) -> None:
-        super().__init__(client, node_spec)
+    _client: DebugPanelClient
+    _node_spec: NodeSpec2
+
+    def __init__(self, client: DebugPanelClient, node_spec: NodeSpec2) -> None:
+        self._client = client
+        self._node_spec = node_spec
 
     def authenticate(self, u: str, p: str) -> _DebugPanelClient2:
         raise NotImplementedError
@@ -349,16 +340,19 @@ class _DebugPanelClient2(_BaseDebugPanelClient):
         raise NotImplementedError
 
 
-class _DebugPanelClient12Pair(_BaseDebugPanelClient):
+class _DebugPanelClient12Pair(_DebugPanelClientInterface):
     """
-    A DebugPanel servlet client for a LOCKSS 1.x/2.x migrating pair.
+    A DebugPanel servlet client for a LOCKSS 1.x/2.x migration pair.
     """
 
+    _client: DebugPanelClient
+    _node_spec: NodeSpec12Pair
     _v1: _DebugPanelClient1
     _v2: _DebugPanelClient2
 
-    def __init__(self, client: DebugPanelClient, node_spec: NodeSpec) -> None:
-        super().__init__(client, node_spec)
+    def __init__(self, client: DebugPanelClient, node_spec: NodeSpec12Pair) -> None:
+        self._client = client
+        self._node_spec = node_spec
         self._v1 = _DebugPanelClient1(client, node_spec.origin)
         self._v2 = _DebugPanelClient2(client, node_spec.destination)
 
@@ -407,11 +401,11 @@ class DebugPanelClient(_DebugPanelClientInterface):
         self._node_spec = node_spec.model_copy()
         match typ := node_spec.type:
             case NodeTypeEnum.V1.value:
-                self._impl = _DebugPanelClient1(self, self._node_spec)
+                self._impl = _DebugPanelClient1(self, cast(NodeSpec1, self._node_spec))
             case NodeTypeEnum.V2.value:
-                self._impl = _DebugPanelClient2(self, self._node_spec)
+                self._impl = _DebugPanelClient2(self, cast(NodeSpec2, self._node_spec))
             case NodeTypeEnum.V1_V2_MIGRATION_PAIR.value:
-                self._impl = _DebugPanelClient12Pair(self, self._node_spec)
+                self._impl = _DebugPanelClient12Pair(self, cast(NodeSpec12Pair, self._node_spec))
             case _:
                 raise InternalError from ValueError(typ)
 

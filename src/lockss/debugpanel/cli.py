@@ -32,16 +32,14 @@
 Command line tool to interact with the LOCKSS 1.x DebugPanel servlet.
 """
 
-from collections.abc import Callable, Iterable, Iterator
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from contextlib import nullcontext
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import chain
 from pathlib import Path
-from typing import Any, Concatenate, Optional, ParamSpec, TypeAlias, TypeVar, Union
+from typing import Any, Concatenate, Optional, TypeAlias, TypeVar, Union
 
-from click_extra import Context, ProgressOption, Section, accessible_option, color_option, echo, group, jobs_option, no_color_option, option, option_group, pass_context, print_table, progressbar, prompt, show_params_option, table_format_option, timer_option, tree_option
-from click_extra.context import JOBS, PROGRESS, TABLE_FORMAT
+from click_extra import Context, OperationTrail, ProgressOption, Section, accessible_option, color_option, echo, group, jobs_option, no_color_option, option, option_group, pass_context, print_table, prompt, run_jobs, show_params_option, table_format_option, timer_option, tree_option
+from click_extra.context import JOBS, TABLE_FORMAT
 from click_extra.decorators import decorator_factory
 from pydantic import ValidationError
 import yaml
@@ -54,9 +52,15 @@ from . import __copyright__, __license__, __version__
 from ._core import DebugPanelClient, UrlOpenT, DEFAULT_DEPTH
 
 
-_OpInput = TypeVar('_OpInput')
+_OpArgs = TypeVar('_OpArgs')
+
+
 _OpResult = TypeVar('_OpResult')
+
+
 _ResultKey = TypeVar('_ResultKey')
+
+
 _ResultValue = TypeVar('_ResultValue')
 
 
@@ -139,40 +143,45 @@ class _DebugPanelCli(object):
         self._generic_auid_action(DebugPanelClient.validate_files)
 
     def _generic_action(self,
-                        func: Callable[Concatenate[_OpInput, dict[str, Any]], _OpResult],
-                        get_tuples: Callable[[], Iterable[tuple[_OpInput, Optional[dict[str, Any]]]]],
-                        get_result: Callable[[_OpResult], _ResultValue],
+                        func: Callable[Concatenate[_OpArgs, dict[str, Any]], _OpResult],
+                        get_tuples: Callable[[], list[tuple[_OpArgs, Optional[dict[str, Any]]]]],
+                        get_result: Optional[Callable[[_OpResult], _ResultValue]] = None,
                         init_funcs: Optional[list[Callable[[], None]]] = None,
-                        transform_key: Optional[Callable[[_OpInput], _ResultKey]] = None,
-                        progress_bar_item: Optional[Callable[[Optional[_OpInput]], Optional[str]]] = None) \
-            -> dict[_ResultKey, _ResultValue]:
+                        transform_key: Optional[Callable[[_OpArgs], _ResultKey]] = None,
+                        get_task_label: Optional[Callable[[_OpArgs], str]] = None) \
+            -> dict[_ResultKey, Union[_ResultValue, Exception]]:
         for init_func in init_funcs or []:
             init_func()
-        results: dict[_ResultKey, _ResultValue] = {}
-        with ThreadPoolExecutor(max_workers=(meta := self._ctx.meta)[JOBS]) as executor:
-            futures: dict[Future[_OpResult], _OpInput] = {executor.submit(func, *a, **(k or {})): a for a, k in get_tuples()}
-            completed: Iterator[Future[_OpResult]] = as_completed(futures)
-            xform: Callable[[_OpInput], _ResultKey] = transform_key or (lambda x: x)
-            itemlbl: Callable[[Optional[_OpInput]], Optional[str]] = lambda f: (progress_bar_item if progress_bar_item else str)(futures[f]) if f else None
-            with progressbar(completed, length=len(futures), label='Progress', item_show_func=itemlbl) if self._ctx.meta[PROGRESS] else nullcontext(completed) as bar:
-                for future in bar:
-                    key: _ResultKey = xform(futures[future])
-                    try:
-                        results[key] = get_result(future.result())
-                    except Exception as exc:
-                        results[key] = str(exc)
+        tasks: list[tuple[_OpArgs, Optional[dict[str, Any]]]] = get_tuples()
+        actual_transform_key: Callable[[_OpArgs], _ResultKey] = transform_key or (lambda x: x)
+        actual_get_result: Callable[[_OpResult], _ResultValue] = get_result or (lambda x: x)
+        actual_get_task_label: Callable[[_OpArgs], str] = get_task_label or str
+        results: dict[_ResultKey, Union[_ResultValue, Exception]] = {}
+        with OperationTrail(jobs=(meta := self._ctx.meta)[JOBS], total=(total_tasks := len(tasks)), progress_bar=True) as trail:
+            def _one_task(args_and_kwargs: tuple[_OpArgs, Optional[dict[str, Any]]]) -> None:
+                result_key: _ResultKey = actual_transform_key(args := args_and_kwargs[0])
+                task_label = actual_get_task_label(args)
+                try:
+                    results[result_key] = actual_get_result(func(*args, **(args_and_kwargs[1] or {})))
+                    trail.mark(True, task_label)
+                except Exception as exc:
+                    results[result_key] = exc
+                    trail.mark(False, task_label)
+            for task in run_jobs(_one_task, tasks):
+                pass # I guess?
+            trail.finish(trail.ok_count == total_tasks, f'{trail.ok_count}/{total_tasks} succeeded')
         return results
 
     def _generic_auid_action(self,
                              func: Callable[Concatenate[tuple[DebugPanelClient, str], dict[str, Any]], UrlOpenT],
                              **kwargs) -> None:
-        results: dict[tuple[str, str], str] = \
+        results: dict[tuple[str, str], Union[str, Exception]] = \
             self._generic_action(func,
                                  lambda: [((client, auid), kwargs) for auid in self._auids for client in self._clients],
-                                 self._process_urlopent,
+                                 get_result=self._process_urlopent,
                                  init_funcs=[self._initialize_clients, self._initialize_auids, self._initialize_auth],
                                  transform_key=lambda t: (t[0].get_id(), t[1]),
-                                 progress_bar_item=lambda t: f'{t[0].get_id()} {t[1]}' if t else None)
+                                 get_task_label=lambda t: f'{t[0].get_id()} {t[1]}')
         sorted_nodes: list[str] = sorted(c.get_id() for c in self._clients)
         sorted_auids: list[str] = sorted(self._auids)
         print_table([[a, *[results[(n, a)] for n in sorted_nodes]] for a in sorted_auids],
@@ -182,16 +191,17 @@ class _DebugPanelCli(object):
     def _generic_node_action(self,
                              func: Callable[Concatenate[tuple[DebugPanelClient], dict[str, Any]], UrlOpenT],
                              **kwargs) -> None:
-        results: dict[tuple[str], str] = \
+        results: dict[tuple[str], Union[str, Exception]] = \
             self._generic_action(func,
                                  lambda: [((client,), kwargs) for client in self._clients],
-                                 self._process_urlopent,
+                                 get_result=self._process_urlopent,
                                  init_funcs=[self._initialize_clients, self._initialize_auth],
                                  transform_key=lambda t: (t[0].get_id(),),
-                                 progress_bar_item=lambda t: f'{t[0].get_id()}' if t else None)
+                                 get_task_label=lambda t: f'{t[0].get_id()}')
         sorted_nodes: list[str] = sorted(c.get_id() for c in self._clients)
         print_table([[n, str(results[(n,)])] for n in sorted_nodes],
-                    ['Node', 'Result'])
+                    ['Node', 'Result'],
+                    table_format=self._ctx.meta[TABLE_FORMAT])
 
     def _initialize_auids(self) -> None:
         """
