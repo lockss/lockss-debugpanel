@@ -41,8 +41,8 @@ maintainers = [
 ]
 dependencies = [
     "click-extra[hjson,toml,xml,yaml] (>=8.8.0,<8.9.0)",
-    "lockss-pybasic (==0.3.0-dev18)",
-    "pydantic (>=2.13.0,<2.14.0)", # from lockss-pybasic 0.3.0-dev18
+    "lockss-pybasic (==0.3.0-dev20)",
+    "pydantic (>=2.13.0,<2.14.0)", # from lockss-pybasic 0.3.0-dev20
     "PyYAML (>=6.0.0,<6.1.0)",
 ]
 classifiers = [
