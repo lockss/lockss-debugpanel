@@ -42,11 +42,11 @@ from click_extra import Context, OperationTrail, ProgressOption, Section, access
 from click_extra.context import JOBS, TABLE_FORMAT
 from click_extra.decorators import decorator_factory
 from pydantic import ValidationError
-import yaml
+from yaml import YAMLError
 
 from lockss.pybasic.cliutil import NonNegativeInt, click_path, compose_decorators
 from lockss.pybasic.fileutil import file_lines
-from lockss.pybasic.nodeutil import NodeSet, get_node_spec_adapter
+from lockss.pybasic.nodeutil import NodeHelper
 
 from . import __copyright__, __license__, __version__
 from ._core import DebugPanelClient, UrlOpenT, DEFAULT_DEPTH
@@ -79,7 +79,10 @@ class _DebugPanelCli(object):
         # Node options
         node_set: tuple[Path, ...] = ()
         node_spec: tuple[str, ...] = ()
-        node_specs: tuple[Path, ...] = ()
+        include_node_set: tuple[str, ...] = ()
+        exclude_node_set: tuple[str, ...] = ()
+        include_node: tuple[str, ...] = ()
+        exclude_node: tuple[str, ...] = ()
         username: Optional[str] = None
         password: Optional[str] = field(default=None, repr=False)
         # AUID options
@@ -223,27 +226,20 @@ class _DebugPanelCli(object):
         Initializes the list of clients. Fails if the list of nodes ends up
         being empty.
         """
-        clients: list[DebugPanelClient] = list()
-        # First from node sets
-        for node_set_path in (opts := self._opts).node_set:
-            with node_set_path.open('r') as node_set_input:
-                try:
-                    node_set_yaml: YamlT = yaml.safe_load(node_set_input)
-                    node_set: NodeSet = NodeSet.model_validate(node_set_yaml)
-                    for node_spec in node_set.nodes:
-                        clients.append(DebugPanelClient(node_spec))
-                except (yaml.YAMLError, ValidationError) as exc:
-                    self._ctx.fail(str(exc))
-        # Then from compact node specifications
-        for compact_node_spec in [*opts.node_spec, *chain.from_iterable(file_lines(file_path) for file_path in opts.node_specs)]:
-            try:
-                clients.append(DebugPanelClient(get_node_spec_adapter().validate_python(compact_node_spec)))
-            except ValidationError as exc:
-                self._ctx.fail(str(exc))
-        # Fail if empty
-        if len(clients) == 0:
+        node_helper: NodeHelper = NodeHelper()
+        try:
+            for node_set_path in (opts := self._opts).node_set:
+                node_helper.add_node_sets_from_file(node_set_path)
+            for compact_node_spec in opts.node_spec:
+                node_helper.add_node_from_spec(compact_node_spec)
+            self._clients = [DebugPanelClient(node_spec) for node_spec in node_helper.nodes_iter(include_node_sets=opts.include_node_set,
+                                                                                                 exclude_node_sets=opts.exclude_node_set,
+                                                                                                 include_nodes=opts.include_node,
+                                                                                                 exclude_nodes=opts.exclude_node)]
+        except (OSError, YAMLError, ValidationError, KeyError, ValueError) as exc:
+            self._ctx.fail(str(exc))
+        if len(self._clients) == 0:
             self._ctx.fail('The list of nodes to process is empty')
-        self._clients = clients
 
     def _process_urlopent(self, urlopent: UrlOpenT) -> str:
         with urlopent as resp:
@@ -268,9 +264,12 @@ _depth_option_group = option_group(
 #: The node option group: --node-set/-s, --node-spec/-n, --node-specs/-N, --username/-U, --password/-P
 _node_option_group = option_group(
     'Node options',
-    option('--node-set', '-s', metavar='FILE', type=click_path('ferz'), multiple=True, help='Add the nodes from the node set in FILE to the list of nodes to process.'),
-    option('--node-spec', '--node', '-n', metavar='NODE', multiple=True, help='Add the compact node specification NODE to the list of nodes to process.'),
-    option('--node-specs', '--nodes', '-N', metavar='FILE', type=click_path('ferz'), multiple=True, help='Add the compact node specifications in FILE to the list of nodes to process.'),
+    option('--node-set', '-s', metavar='FILE', type=click_path('ferz'), multiple=True, help='Load the node sets in FILE.'),
+    option('--node-spec', '--node', metavar='NSPEC', multiple=True, help='Add the compact node specification NSPEC to a default node set.'),
+    option('--include-node-set', '-I', metavar='NSID', multiple=True, show_default='process all node sets', help='Add the node set identifier NSID to the list of node sets to process.'),
+    option('--exclude-node-set', '-E', metavar='NSID', multiple=True, show_default='exclude no node set', help='Add the node set identifier NSID to the list of node sets to skip.'),
+    option('--include-node', '-i', metavar='NID', multiple=True, show_default='process all nodes', help='Add the node identifier NID to the list of nodes to process.'),
+    option('--exclude-node', '-e', metavar='NID', multiple=True, show_default='exclude no node', help='Add the node identifier NID to the list of nodes to skip.'),
     option('--username', '-U', metavar='USER', show_default='interactive prompt', help='Set the UI username to USER.'),
     option('--password', '-P', metavar='PASS', show_default='interactive prompt', help='Set the UI password to PASS.')
 )
