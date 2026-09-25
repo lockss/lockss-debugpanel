@@ -261,7 +261,8 @@ _depth_option_group = option_group(
 )
 
 
-#: The node option group: --node-set/-s, --node-spec/-n, --node-specs/-N, --username/-U, --password/-P
+#: The node option group:
+#: --node-set, -s; --node-spec, --node; --include-node-set, -I; --exclude-node-set, -E; --include-node, -i; --exclude-node, -e; --username, -U; --password, -P
 _node_option_group = option_group(
     'Node options',
     option('--node-set', '-s', metavar='FILE', type=click_path('ferz'), multiple=True, help='Load the node sets in FILE.'),
